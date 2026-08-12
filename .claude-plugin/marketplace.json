@@ -1,0 +1,16 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "securitymaxxing",
+  "description": "Evidence-based application security tooling for Claude Code.",
+  "owner": {
+    "name": "Kenji Tubera"
+  },
+  "plugins": [
+    {
+      "name": "securitymaxxing",
+      "description": "Evidence-based application security for Claude Code: audit commands that prove findings with file:line and exploit paths, plus skills that make Claude write secure code by default.",
+      "category": "security",
+      "source": "./"
+    }
+  ]
+}
