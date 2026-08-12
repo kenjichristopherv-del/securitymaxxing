@@ -63,10 +63,12 @@ Type `/sec` in Claude Code and they'll all filter into view.
 | `/securitymaxxing:deps` | Runs the real auditor, then **triages** — which of the 140 alerts are actually reachable |
 | `/securitymaxxing:harden` | Docker, Kubernetes, Terraform, cloud IAM, and detection readiness |
 | `/securitymaxxing:llm` | Prompt injection, tool authority, RAG tenant isolation, unsafe model output |
+| `/securitymaxxing:redteam` | Proves it. Builds a working PoC against your own app, and attacks your defenses to confirm they hold |
 | `/securitymaxxing:fix` | The only command that writes code. Fixes the class, verifies the patch, adds the regression test |
 | `/securitymaxxing:explain` | Explains a vulnerability against *your* code, so you can spot it yourself next time |
 
-Every command except `fix` is read-only.
+Every command is read-only except `fix` (which writes patches) and `redteam` (which sends
+active attacks against an app you own).
 
 ## The skills
 
@@ -90,11 +92,18 @@ ownership check part of the query the first time the query gets written.
 ```
 
 A good workflow: `authz` and `injection` on the code you actually shipped, `secrets` once
-against full history, `diff` on every PR, `ship-check` before launch.
+against full history, `redteam` to prove the findings are real, `diff` on every PR,
+`ship-check` before launch.
+
+**Find → prove → fix.** The commands come as a loop: a review command surfaces a hypothesis,
+`redteam` builds a working proof-of-concept against your own app (and attacks your existing
+defenses to confirm they hold), and `fix` closes it with a regression test that keeps the PoC
+from ever coming back. A finding you've watched get exploited and then blocked is a finding you
+can trust.
 
 ## Prompt catalog
 
-**[PROMPTS.md](PROMPTS.md)** — 70+ security prompts as raw, copy-pasteable text. Use them in
+**[PROMPTS.md](PROMPTS.md)** — 75+ security prompts as raw, copy-pasteable text. Use them in
 Cursor, Copilot, ChatGPT, or anywhere else; edit them for your stack; or read them to see
 exactly what the commands are asking for.
 

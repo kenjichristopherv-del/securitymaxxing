@@ -16,7 +16,7 @@ what the commands are actually asking for.
 [10. AI & LLM](#10-ai--llm-features) · [11. Business logic](#11-business-logic) ·
 [12. Code review](#12-code-review--pull-requests) · [13. Pre-launch](#13-pre-launch) ·
 [14. Plain English](#14-plain-english-for-vibe-coders) · [15. Fixing](#15-fixing--verifying) ·
-[16. Learning](#16-learning)
+[16. Learning](#16-learning) · [17. Red team](#17-red-team--proving-it)
 
 ---
 
@@ -884,6 +884,64 @@ Something went wrong: [describe]. Help me work out what happened. What in this c
 could produce that symptom? What logs or data would confirm or rule out each hypothesis?
 What should I preserve right now before it rotates away? What do I need to rotate or revoke
 immediately as a precaution, before I even know the cause?
+```
+
+---
+
+## 17. Red team — proving it
+
+*A finding is a hypothesis until an exploit confirms it. These prove — or disprove — a finding
+against **your own** application. Only run active attacks against systems you own or are
+explicitly authorized to test.*
+
+**17.1 — Build a proof-of-concept**
+```
+This is my own application and I want to confirm whether this finding is actually exploitable
+before I spend time on it. Build a working proof-of-concept against a local or staging
+instance. First state the falsifiable prediction — "if this IDOR is real, requesting order
+1042 as user B returns user A's data." Set up a safe harness: run it locally if possible, and
+create two throwaway accounts (attacker + victim) so cross-user access is proven without
+touching real users. Send the attack, capture the exact request and the exact response that
+proves or disproves it. Keep it NON-DESTRUCTIVE — demonstrate read access, prove write access
+with a marker you then clean up, and stop short of anything irreversible. Redact real secrets
+and PII from the output. End with a verdict: EXPLOITED / NOT EXPLOITABLE / BLOCKED BY <control>,
+and reproduce steps I can re-run.
+```
+
+**17.2 — Attack the defenses**
+```
+Don't just look for missing controls — attack the ones that exist. For every place the code
+relies on a defense (a sanitizer, an input filter, an allowlist, auth middleware, a rate
+limit), try to defeat it against my own running app: encoding and double-encoding, unicode and
+case variation, the alternate route that skips the middleware, a mutation payload past the
+sanitizer, IP spoofing past the rate limit. For anything that survives an honest attempt to
+beat it, report it as VERIFIED STRONG and name the control — I want to know what's actually
+holding, not just what's missing.
+```
+
+**17.3 — Verify a fix under attack**
+```
+This was just fixed. Prove the fix works by re-running the original exploit against my app — a
+fix isn't verified until the original attack fails. Then try the obvious bypasses of the fix
+itself, not just the literal payload from the report: encoded, unicode, double-encoded,
+case-varied, and any second entry point to the same sink. Tell me whether the fix holds or
+whether there's still a way through, with the exact request either way.
+```
+
+**17.4 — Confirm a leaked credential is live**
+```
+I found what looks like a valid credential in my own repo. Confirm whether it's currently
+active with a single, minimal, READ-ONLY authenticated call to its provider — nothing more.
+Redact the key itself in your output. If it's live, tell me the exact rotation steps for that
+provider and where to check its audit log for prior misuse. Rotation is the fix; treat the key
+as compromised regardless of the result.
+```
+
+**17.5 — Turn the PoC into a permanent test**
+```
+Take this confirmed exploit and turn it into a regression test in my project's existing test
+framework — one that fails against the vulnerable code and passes once it's fixed. This way the
+vulnerability can never silently come back, and the proof lives in CI instead of in a chat log.
 ```
 
 ---
