@@ -1,7 +1,7 @@
 {
   "name": "securitymaxxing",
   "description": "Evidence-based application security for Claude Code. Slash commands that audit your codebase for real, exploitable vulnerabilities (OWASP Top 10, API Top 10, LLM Top 10) with file:line proof and patches, plus skills that make Claude write secure code by default. Built for software engineers and vibe coders alike.",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "author": {
     "name": "Kenji Tubera"
   },

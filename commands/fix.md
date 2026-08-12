@@ -82,3 +82,9 @@ Then:
 If at any point a fix would require a design decision with real tradeoffs (breaking an API,
 forcing re-authentication of all users, changing a data model), stop and present the options
 rather than choosing silently.
+
+## Recommended next step
+
+Close by printing one line — `→ Recommended next: …`: re-run the review command that surfaced the
+finding (e.g. `/securitymaxxing:authz`) to confirm it now comes back clean, and
+`/securitymaxxing:diff` before you commit.

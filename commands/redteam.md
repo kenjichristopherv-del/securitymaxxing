@@ -126,3 +126,9 @@ Then:
 
 End by handing confirmed-exploitable findings to `/securitymaxxing:fix`, and offering to keep
 the PoCs as regression tests so a fix can never silently regress.
+
+## Recommended next step
+
+Close by printing one line — `→ Recommended next: …`:
+- Anything EXPLOITED → `/securitymaxxing:fix`, and keep the PoC as a regression test so it can't silently return.
+- All NOT EXPLOITABLE / BLOCKED → say so plainly; that verified-strong result is itself the finding.

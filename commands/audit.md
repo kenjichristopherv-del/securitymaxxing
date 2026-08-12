@@ -128,3 +128,10 @@ Use the finding format from `security-review-method`. Structure:
 5. **Do this first** — the top 3 fixes ranked by risk reduced per unit of effort.
 
 Then stop. Do not begin fixing. Offer `/securitymaxxing:fix` for remediation.
+
+## Recommended next step
+
+Close by printing one line — `→ Recommended next: …` — chosen by what you found:
+- Confirmed CRITICAL/HIGH → `/securitymaxxing:redteam` to prove each with a working PoC, then `/securitymaxxing:fix`.
+- Only LOW/INFO, or clean → say so; `/securitymaxxing:harden` for the infra side, `/securitymaxxing:ship-check` before launch.
+- A finding the reader wants unpacked → `/securitymaxxing:explain <finding>`.

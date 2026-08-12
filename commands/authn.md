@@ -105,3 +105,9 @@ Password reset is usually the weakest link in an otherwise solid auth system.
 Standard finding format. For each finding, give the concrete takeover path — the sequence of
 requests an attacker sends. Close with the auth flows you verified and any that you could not
 review without a running system.
+
+## Recommended next step
+
+Close by printing one line — `→ Recommended next: …`:
+- Auth weakness found → `/securitymaxxing:redteam` (token replay, JWT forge, reset-token reuse) to prove it, then `/securitymaxxing:fix`.
+- Clean → note it, and run `/securitymaxxing:ship-check` before launch.

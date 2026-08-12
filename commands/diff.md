@@ -74,3 +74,9 @@ Standard finding format. Then:
   one-line reason.
 - **Blocking items** vs **non-blocking follow-ups**, separated clearly.
 - If nothing is wrong, say so in one line and name what you checked. Do not manufacture nits.
+
+## Recommended next step
+
+Close by printing one line — `→ Recommended next: …`:
+- Blocking finding → `/securitymaxxing:fix` before merge.
+- Safe to merge → say so and merge; no next command needed.

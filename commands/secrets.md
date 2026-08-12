@@ -100,3 +100,9 @@ Then, for anything real:
 
 If nothing was found, say so and list what you searched — including the history commands you
 ran — so the reader knows the coverage.
+
+## Recommended next step
+
+Close by printing one line — `→ Recommended next: …`:
+- A live secret confirmed → ROTATE it now (a manual provider action, not a command), then clean history, then add a pre-commit scanner. Rotation is the fix; a code edit is not.
+- Nothing found → state the coverage, including the history commands you ran.

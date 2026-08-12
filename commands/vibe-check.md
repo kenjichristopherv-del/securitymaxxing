@@ -88,3 +88,10 @@ A direct answer to the question they actually asked: **is this safe to put on th
 right now?** Yes, yes-with-these-two-fixes, or no-and-here's-the-one-thing. No hedging, no wall
 of caveats. Then offer `/securitymaxxing:fix` to do the repairs, or
 `/securitymaxxing:explain` if they want any finding broken down further.
+
+## Recommended next step
+
+Close by printing one line — `→ Recommended next: …`, in plain language:
+- 🚨 items → `/securitymaxxing:fix` to repair them.
+- Want one explained → `/securitymaxxing:explain <it>`.
+- Mostly fine → `/securitymaxxing:ship-check` before you launch.

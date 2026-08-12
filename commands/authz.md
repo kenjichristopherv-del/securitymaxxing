@@ -113,3 +113,9 @@ so the reader knows what's still unchecked.
 Close with the structural recommendation: if the codebase enforces authorization by convention
 rather than by construction, say so and propose the layer that would make the safe path the
 default.
+
+## Recommended next step
+
+Close by printing one line — `→ Recommended next: …`:
+- IDOR or broken access confirmed → `/securitymaxxing:redteam` (spin up attacker + victim accounts to prove the cross-user read/write), then `/securitymaxxing:fix`.
+- Clean but authorization is held by convention → `/securitymaxxing:fix` to build the structural guardrail you recommended.

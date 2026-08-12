@@ -118,3 +118,8 @@ with it, and the **code-level** control that fixes it — not a prompt-level mit
 Include the tool-authority table. Close with a blunt statement of the worst case: "if an
 attacker fully controls the model's behavior, they can ______." That sentence is the real
 security posture of an AI feature.
+
+## Recommended next step
+
+Close by printing one line — `→ Recommended next: …`:
+- Injectable surface or over-powered tool → `/securitymaxxing:redteam` with injection payloads to prove the authority, then `/securitymaxxing:fix` — in code, never in the prompt.

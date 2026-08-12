@@ -86,3 +86,7 @@ Standard finding format. For each finding state **what protection the reader bel
 have, and what they actually have** — that gap is the finding. Where the fix requires
 re-encrypting existing data or rotating a key, say so and outline the migration; a crypto fix
 that ignores existing ciphertext is not a fix.
+
+## Recommended next step
+
+Close by printing one line — `→ Recommended next: …`: `/securitymaxxing:fix` for the code changes — and flag explicitly where a fix requires re-encrypting existing data or rotating a key, since that's a migration, not a patch.

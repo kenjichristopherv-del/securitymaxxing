@@ -96,3 +96,9 @@ The pipeline holds production credentials and runs untrusted code. Review it as 
    a scheduled audit job
 
 State clearly which tools you actually ran and which you could not.
+
+## Recommended next step
+
+Close by printing one line — `→ Recommended next: …`:
+- Reachable vulnerable dependency → `/securitymaxxing:fix` for the ones that actually matter, with the version bump or override.
+- Then stand up Dependabot/Renovate and CI scanning so this stays green without you.

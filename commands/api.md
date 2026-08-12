@@ -114,3 +114,9 @@ that lie about auth requirements are themselves a finding.
 Standard finding format, grouped by the categories above, with the specific config or handler
 cited. Skip categories that don't apply to this architecture and say why — a machine-to-machine
 JSON API shouldn't be dinged for missing CSP.
+
+## Recommended next step
+
+Close by printing one line — `→ Recommended next: …`:
+- Provable issue (CORS reflection, upload, GraphQL authz) → `/securitymaxxing:redteam` to demonstrate it, then `/securitymaxxing:fix`.
+- Config or header gaps → `/securitymaxxing:fix`.

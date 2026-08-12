@@ -87,3 +87,9 @@ Not verifiable from code — confirm manually:
 
 If the answer is SHIP, say it without hedging. Manufacturing doubt to seem thorough is its own
 kind of unhelpful.
+
+## Recommended next step
+
+Close by printing one line — `→ Recommended next: …`:
+- DO NOT SHIP / SHIP WITH CONDITIONS → `/securitymaxxing:fix` the blockers, then re-run `/securitymaxxing:ship-check` to confirm the gate is green.
+- SHIP → ship.

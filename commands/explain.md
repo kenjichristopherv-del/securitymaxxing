@@ -49,3 +49,9 @@ suspicious, what question to ask when reviewing a PR.
   attacking systems the user doesn't own, and if the question is really "how do I break into
   someone else's system," say plainly that you'll explain the defense instead.
 - **No moralizing.** They're trying to learn how their software breaks. That's the right instinct.
+
+## Recommended next step
+
+Close by printing one line — `→ Recommended next: …`: if the pattern exists in their code,
+`/securitymaxxing:fix`; otherwise back to whatever review raised it (or `/securitymaxxing:audit`
+if they came in cold).

@@ -81,3 +81,10 @@ Output:
    silent assumptions is how systems get owned.
 
 Offer to save this to `docs/threat-model.md`. Ask before writing.
+
+## Recommended next step
+
+Close by printing one line — `→ Recommended next: …`: verify the top risks against the code —
+`/securitymaxxing:authz`, `/securitymaxxing:injection`, or `/securitymaxxing:authn` for the
+app-layer ones, `/securitymaxxing:harden` for the infra ones. A threat model is a list of
+hypotheses until the code confirms each.

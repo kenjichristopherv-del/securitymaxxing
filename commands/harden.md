@@ -99,3 +99,9 @@ real exposure — a permissive security group on a private subnet is not the sam
 public instance. Close with the three changes that reduce the most risk per unit of effort, and
 note anything you could not see from the repository (live cloud state, console settings) that
 should be verified directly.
+
+## Recommended next step
+
+Close by printing one line — `→ Recommended next: …`:
+- IaC/config findings → `/securitymaxxing:fix`; live-console findings are manual — name them so they aren't missed.
+- Then `/securitymaxxing:ship-check` for the go/no-go.

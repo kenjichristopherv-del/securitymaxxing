@@ -130,3 +130,17 @@ Do not modify code during a review unless explicitly asked. A review is read-onl
 first, patches second, and only on request. Never run exploits against a live system, never
 touch infrastructure you were not pointed at, and never exfiltrate real secrets into the
 transcript — refer to them by location, redact the value (`AKIA…7Q3F`).
+
+## Always end with the next step
+
+Every command in this toolkit closes its report with one line — `→ Recommended next: …` — so the
+user is never left holding findings with no path forward. The through-line is **find → prove →
+fix → re-review**:
+
+- A review surfaced exploitable findings → prove them with `/securitymaxxing:redteam`, then patch
+  with `/securitymaxxing:fix`.
+- `fix` finished → re-run the review that raised the finding, to confirm it now comes back clean.
+- The review was clean → say so, and point at the next gate (`/securitymaxxing:ship-check`) or the
+  next surface — never invent work to fill the line.
+
+Tailor the recommendation to what you actually found. Never end a report without it.

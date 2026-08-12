@@ -108,3 +108,9 @@ Before reporting, for each candidate:
 Standard format. For every finding show the **full trace**: source line → intermediate hops →
 sink line. Give a concrete payload that demonstrates it. Prefer fixes that eliminate the class
 (parameterization, a safe wrapper, a strict allowlist at the boundary) over per-call escaping.
+
+## Recommended next step
+
+Close by printing one line — `→ Recommended next: …`:
+- Sink reachable from a source → `/securitymaxxing:redteam` to fire the payload and prove the effect, then `/securitymaxxing:fix`.
+- Reachability uncertain → `/securitymaxxing:redteam` to settle it before spending fix effort.
