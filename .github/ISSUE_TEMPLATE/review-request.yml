@@ -1,0 +1,74 @@
+name: Request a launch review
+description: Ask for a hands-on security review of your app (see REVIEW.md). This issue is public — describe the app, never paste code or secrets.
+title: "Review request: <your app>"
+labels: ["review-request"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for asking. **This issue is public.** Describe your app in general terms — don't paste code, credentials, URLs to private systems, or anything confidential. Scope, price, and access are arranged privately after a reply.
+  - type: textarea
+    id: what
+    attributes:
+      label: What does your app do?
+      description: One or two sentences, plus who uses it.
+      placeholder: A booking app for small clinics; staff log in, patients book online.
+    validations:
+      required: true
+  - type: input
+    id: stack
+    attributes:
+      label: Stack
+      placeholder: Next.js + Supabase, or FastAPI + Postgres, etc.
+    validations:
+      required: true
+  - type: dropdown
+    id: size
+    attributes:
+      label: Roughly how big?
+      options:
+        - Small — a handful of pages and API routes
+        - Medium — dozens of routes, one main service
+        - Large — many services, or app + mobile + backend
+        - Not sure
+    validations:
+      required: true
+  - type: checkboxes
+    id: data
+    attributes:
+      label: What does it handle? (tick all that apply)
+      options:
+        - label: User accounts and logins
+        - label: Payments or money
+        - label: Personal data (names, addresses, IDs)
+        - label: Health, financial, or other regulated data
+        - label: An AI feature (chat, agents, document upload)
+  - type: dropdown
+    id: tier
+    attributes:
+      label: Which review?
+      options:
+        - Launch review ($249)
+        - Review + fix support ($499)
+        - Not sure — help me choose
+    validations:
+      required: true
+  - type: input
+    id: when
+    attributes:
+      label: When do you need it?
+      placeholder: Launching on the 20th / no rush
+  - type: input
+    id: contact
+    attributes:
+      label: How should we reach you privately?
+      description: Optional. Or leave blank and we'll reply here first.
+  - type: checkboxes
+    id: understood
+    attributes:
+      label: Before you submit
+      options:
+        - label: I understand this is a code review, not a penetration test or a guarantee, and that my code would be reviewed using Claude (Anthropic).
+          required: true
+        - label: I haven't pasted code, secrets, or confidential details into this public issue.
+          required: true

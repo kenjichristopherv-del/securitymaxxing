@@ -1,7 +1,7 @@
 # securitymaxxing
 
 [![License: Apache 2.0](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-1.1.0-informational.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-1.2.0-informational.svg)](CHANGELOG.md)
 [![OWASP Top 10:2025](https://img.shields.io/badge/OWASP-Top%2010%3A2025-black.svg)](https://owasp.org/Top10/2025/)
 [![Claude Code plugin](https://img.shields.io/badge/Claude%20Code-plugin-d97757.svg)](https://code.claude.com/docs/en/plugins)
 
@@ -131,6 +131,12 @@ checks. In our tests it found twice as much.
   file uploads, an AI feature, a new kind of user.
 
 If anything in a report doesn't make sense, ask: `/securitymaxxing:explain the first finding`.
+Need something to show a co-founder, a client, or an investor? `/securitymaxxing:report` turns
+the findings into a shareable report: a plain-English verdict and fix plan up front, with the
+technical detail behind it.
+
+**Rather have a person do it?** A [hands-on launch review](REVIEW.md) runs the deep review for
+you, checks every finding by hand, and delivers the report. It starts at $249.
 
 ---
 
@@ -143,6 +149,7 @@ If anything in a report doesn't make sense, ask: `/securitymaxxing:explain the f
 /securitymaxxing:audit              # 4. Re-check: the ledger shows what's fixed or regressed
 /securitymaxxing:diff               # 5. Every PR: catch the vulnerability as it's introduced
 /securitymaxxing:ship-check         # 6. Launch gate
+/securitymaxxing:report             # 7. The write-up for whoever needs it
 ```
 
 Focused reviews when you know where to look: `authz` (the highest-yield one), `authn`,
@@ -239,6 +246,7 @@ Type `/securitymaxxing:` in Claude Code to list them all.
 | `/securitymaxxing:llm` | Prompt injection, tool authority, RAG tenant isolation, unsafe model output |
 | `/securitymaxxing:redteam` | Proves it. Builds a working PoC against your own app, and attacks your defenses to confirm they hold |
 | `/securitymaxxing:fix` | Fixes the class, verifies the patch, adds the regression test. Works from the findings ledger |
+| `/securitymaxxing:report` | Turns the findings into a shareable report — verdict, what could happen, fix plan, then the detail — for a co-founder, client, or investor |
 | `/securitymaxxing:explain` | Explains a vulnerability against *your* code, so you can spot it yourself next time |
 
 Every command is read-only except `fix` and `help` (which write patches, and `help` asks first),

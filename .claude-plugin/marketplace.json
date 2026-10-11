@@ -10,7 +10,7 @@
     {
       "name": "securitymaxxing",
       "description": "Evidence-based application security for Claude Code: audit commands that prove findings with file:line and exploit paths, a redteam command that confirms them with working PoCs, LLM and agent security review, and skills that make Claude write secure code by default.",
-      "version": "1.1.0",
+      "version": "1.2.0",
       "author": {
         "name": "Kenji Tubera",
         "url": "https://github.com/kenjichristopherv-del"

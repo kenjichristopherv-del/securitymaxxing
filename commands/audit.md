@@ -197,6 +197,9 @@ one line under Coverage.
  "findings": [{"id": "SMX-<class>-<short-slug>", "title": "...", "severity": "MEDIUM",
                "class": "OWASP A07:2025 / CWE-613", "location": "app/main.py:16012",
                "status": "open", "confidence": "Confirmed",
+               "impact": "<one plain-English sentence: who can do what to whom>",
+               "evidence": "<the key line(s), quoted briefly — never a secret value>",
+               "fix": "<the specific change, one or two sentences>",
                "first_seen": "YYYY-MM-DD", "last_seen": "YYYY-MM-DD", "commit": "<short sha>"}]}
 ```
 

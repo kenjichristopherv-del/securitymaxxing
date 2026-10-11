@@ -1,5 +1,20 @@
 # Changelog
 
+## 1.2.0 — 2026-10-11
+
+### Added
+- **`/securitymaxxing:report`.** Turns the findings ledger, or this session's reviews, into a
+  shareable report. It opens with a plain-English verdict, what could happen, and a prioritized
+  fix plan with a "things only you can do" list. Progress since the last review, the full
+  findings, what was checked, and the scope and limits follow. It summarizes only what was
+  established, never prints secrets, and has `founder`, `engineering`, and `client` modes.
+- **[REVIEW.md](REVIEW.md) and a "Request a launch review" issue form**, for people who'd rather
+  have a person run the review and stand behind the report.
+
+### Changed
+- Ledger entries now carry `impact`, `evidence`, and `fix`, so reports and later sessions don't
+  have to re-derive them from the code.
+
 ## 1.1.0 — 2026-10-11
 
 Measured, not claimed. A blind benchmark on a production FastAPI app (171 routes, 53 verified
