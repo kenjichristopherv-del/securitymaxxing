@@ -5,16 +5,152 @@
 [![OWASP Top 10:2025](https://img.shields.io/badge/OWASP-Top%2010%3A2025-black.svg)](https://owasp.org/Top10/2025/)
 [![Claude Code plugin](https://img.shields.io/badge/Claude%20Code-plugin-d97757.svg)](https://code.claude.com/docs/en/plugins)
 
-**Application security for Claude Code.** Audit commands that prove their findings, plus skills
-that make Claude write secure code before you ask.
+**Is my app safe to put on the internet?** securitymaxxing is a Claude Code plugin that answers
+that in plain English, then works through the fixes alongside you: one change at a time, and it
+asks before each one.
 
-Built for two people: the engineer who knows what an IDOR is and wants a rigorous second pair
-of eyes, and the builder who shipped something with AI help and needs a straight answer to
-"is this safe to put on the internet?"
+It's built for people who made something with AI help and don't speak security, and it's just
+as useful to engineers who want a rigorous, measured second pair of eyes.
 
 ---
 
-## Why this exists
+## Start here: make your app safe, step by step
+
+No security background needed. Plan on about 15–30 minutes. Nothing is changed without your
+say-so.
+
+### Step 1: Open your project in Claude Code
+
+You need [Claude Code](https://code.claude.com) installed. In a terminal, go to your project
+folder and start it:
+
+```
+cd path/to/your-app
+claude
+```
+
+**Save a checkpoint first.** If your project uses git, commit your current work so any change can
+be undone with one command:
+
+```
+git add -A
+git commit -m "Before security fixes"
+```
+
+### Step 2: Install securitymaxxing
+
+Type this into Claude Code:
+
+```
+/plugin install securitymaxxing --marketplace kenjichristopherv-del/securitymaxxing
+```
+
+### Step 3: Get a plain-English verdict (changes nothing)
+
+```
+/securitymaxxing:vibe-check
+```
+
+It reads your code and tells you, without jargon:
+
+- 🚨 **Fix before anyone uses this.** What a stranger could do today, and how bad it would be.
+- ⚠️ **Fix soon.**
+- 💡 **Worth doing eventually.**
+- ✅ **What's already fine.** So you know what *not* to touch.
+- 🤔 **What it couldn't check.** Usually your hosting dashboard or database settings.
+
+It ends with a straight answer: is it safe to put online right now? This step is read-only.
+It won't edit a file.
+
+<details>
+<summary>What a finding looks like</summary>
+
+> 🚨 **Anyone can read anyone's notes.**
+> Your app checks that someone is logged in, but not that the note they asked for is *theirs*.
+> Change the number in `/api/notes/101` to `102` and you get someone else's note, private
+> details and all.
+> **Where:** `server.js:47`
+> **Fix:** look the note up by its ID *and* the logged-in user's ID, and say "not found" when it
+> isn't theirs. (The corrected code follows.)
+
+</details>
+
+### Step 4: Fix it together
+
+```
+/securitymaxxing:help
+```
+
+`help` walks the whole way with you: it finds the real problems, shows that they're real on your
+own machine, fixes them, and checks that the fix worked.
+
+- **Before every change** it shows you what it wants to change, in plain words, and waits for your
+  yes.
+- **It never** commits, pushes, deletes your work, or touches anything live on the internet.
+- Claude Code may ask permission to run a command, such as starting your app or running your
+  tests. Read the command, and approve it if it looks like part of the job.
+
+You can also tell it what you're worried about, for example
+`/securitymaxxing:help people can see each other's orders`.
+
+### Step 5: Do the things only you can do
+
+Some fixes can't happen in code. `help` ends with a short list, for example:
+
+- **Rotate a leaked key.** Make a new one in the provider's dashboard and delete the old one.
+  Deleting it from your code isn't enough: if it was ever committed or shared, assume it's out.
+- Change a setting in your hosting or database dashboard.
+
+Don't skip this list. It's often the most important part.
+
+### Step 6: Before you launch
+
+```
+/securitymaxxing:ship-check
+```
+
+This is a pre-launch gate. It checks ten blockers and gives a clear **SHIP / SHIP WITH
+CONDITIONS / DO NOT SHIP** verdict.
+
+If your app handles real money or real personal data, also run the thorough version once:
+
+```
+/securitymaxxing:audit --deep
+```
+
+It reads every route with several reviewers working in parallel, and double-checks every
+finding. It costs about $5–6 per run on a mid-sized app, against well under $1 for the quick
+checks. In our tests it found twice as much.
+
+### Step 7: Stay safe as you keep building
+
+- **Nothing to run for this.** While Claude writes code, a built-in check flags risky patterns
+  (a missing ownership check, a hard-coded key) as they appear, before they ship.
+- **Before you commit a big change**, run `/securitymaxxing:diff` to review just what changed.
+- **Run `/securitymaxxing:vibe-check` again** whenever you add something important: payments,
+  file uploads, an AI feature, a new kind of user.
+
+If anything in a report doesn't make sense, ask: `/securitymaxxing:explain the first finding`.
+
+---
+
+## For engineers: the find → prove → fix loop
+
+```
+/securitymaxxing:audit --deep       # 1. Find: every entry point reviewed, every finding verified
+/securitymaxxing:redteam            # 2. Prove: working PoCs against your local or staging app
+/securitymaxxing:fix                # 3. Fix: the class, not the instance, plus a regression test
+/securitymaxxing:audit              # 4. Re-check: the ledger shows what's fixed or regressed
+/securitymaxxing:diff               # 5. Every PR: catch the vulnerability as it's introduced
+/securitymaxxing:ship-check         # 6. Launch gate
+```
+
+Focused reviews when you know where to look: `authz` (the highest-yield one), `authn`,
+`injection`, `secrets` (across full git history), `api`, `crypto`, `deps`, `harden`, `llm`, and
+`threat-model`. Every finding has a traced source → sink, a `file:line`, an exploit path, and a
+patch. Zero findings is a valid answer.
+
+## Does it actually help? (measured)
 
 Today's models are already decent security reviewers. What they aren't is **thorough** or
 **consistent**: a single review of a real codebase reads part of it, a different part each time,
@@ -57,7 +193,7 @@ What securitymaxxing adds either way:
 - **Plain English when you want it.** `vibe-check` and `help` are written for people who build
   with AI and don't speak AppSec.
 
-## Install
+## Other ways to install
 
 ```
 /plugin install securitymaxxing --marketplace kenjichristopherv-del/securitymaxxing
@@ -82,15 +218,15 @@ What changed between versions: [CHANGELOG.md](CHANGELOG.md).
 
 ## The commands
 
-Type `/securitymaxxing:` in Claude Code to list them all. Not sure where to start? `/securitymaxxing:help`.
+Type `/securitymaxxing:` in Claude Code to list them all.
 
 | Command | What it does |
 |---|---|
+| `/securitymaxxing:vibe-check` | Plain-English safety check. No jargon, real rigor, a direct verdict, no changes |
 | `/securitymaxxing:help` | Not sure where to start? A guided, plain-English pass that finds, proves, fixes, and re-checks — asking before every code change |
+| `/securitymaxxing:ship-check` | Pre-launch gate. Ten blockers, then should-fixes, then a SHIP / DO NOT SHIP verdict |
 | `/securitymaxxing:audit` | Full audit — maps the attack surface first, then works every vulnerability class with traced evidence. Add `--deep` for the multi-agent version that covers every entry point and verifies every finding (slower, ~10× the cost, about twice the recall) |
 | `/securitymaxxing:diff` | Reviews a diff, branch, or PR. Catches the removed guard clause and the route registered on the wrong router |
-| `/securitymaxxing:vibe-check` | Plain-English safety check. No jargon, real rigor, direct verdict |
-| `/securitymaxxing:ship-check` | Pre-launch gate. Ten blockers, then should-fixes, then a SHIP / DO NOT SHIP verdict |
 | `/securitymaxxing:threat-model` | STRIDE model with a Mermaid data-flow diagram and trust boundaries |
 | `/securitymaxxing:authz` | Broken access control — IDOR, mass assignment, tenant isolation. The highest-yield review |
 | `/securitymaxxing:authn` | Auth, sessions, JWTs, password reset, OAuth account-linking takeover |
@@ -151,26 +287,6 @@ Skills load automatically when Claude detects the relevant work — no command n
 of the query the first time the query gets written — and the write-time hook backs it up for the
 times it doesn't load.
 
-## Try it
-
-```
-/securitymaxxing:help                # start here if you just want it made safe
-/securitymaxxing:audit --deep        # the thorough one, before a launch or a big release
-/securitymaxxing:vibe-check          # a plain-English verdict, no changes made
-/securitymaxxing:authz src/api       # start here if you are
-/securitymaxxing:diff                # before every commit that touches a route
-```
-
-A good workflow: `authz` and `injection` on the code you actually shipped, `secrets` once
-against full history, `redteam` to prove the findings are real, `diff` on every PR,
-`ship-check` before launch.
-
-**Find → prove → fix.** The commands come as a loop: a review command surfaces a hypothesis,
-`redteam` builds a working proof-of-concept against your own app (and attacks your existing
-defenses to confirm they hold), and `fix` closes it with a regression test that keeps the PoC
-from ever coming back. A finding you've watched get exploited and then blocked is a finding you
-can trust.
-
 ## Prompt catalog
 
 **[PROMPTS.md](PROMPTS.md)** — 78 security prompts as raw, copy-pasteable text. Use them in
@@ -186,8 +302,8 @@ that every other prompt depends on, so paste it before any security prompt in an
 Software Supply Chain Failures and A10 Mishandling of Exceptional Conditions (fail-open error
 handling) — the OWASP API Security Top 10 (2023), the OWASP Top 10 for LLM Applications (2025), and
 the OWASP Top 10 for Agentic Applications (2026: goal hijack, tool misuse, memory poisoning,
-inter-agent trust, MCP rug pulls), plus the things those lists don't cover well: business logic and race conditions, CI/CD and
-supply chain, cloud IAM, cost-based denial of service, and incident readiness.
+inter-agent trust, MCP rug pulls), plus the things those lists don't cover well: business logic
+and race conditions, CI/CD and supply chain, cloud IAM, cost-based denial of service, and incident readiness.
 
 ## What this is not
 
@@ -199,8 +315,9 @@ targeted proof-of-concept requests to an instance you own, but that confirms spe
 it is not a penetration test. Findings are hypotheses until verified.
 
 `redteam` is for systems you own or are explicitly authorized to test. It asks before sending
-anything, defaults to local or staging, and stays non-destructive. For anything holding real money or real personal data, this belongs
-*alongside* a human review, not instead of one.
+anything, defaults to local or staging, and stays non-destructive.
+
+For anything holding real money or real personal data, this belongs *alongside* a human review, not instead of one.
 
 ## Evals
 
