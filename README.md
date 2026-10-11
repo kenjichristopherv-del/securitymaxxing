@@ -1,7 +1,7 @@
 # securitymaxxing
 
 [![License: Apache 2.0](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-0.2.2-informational.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-1.0.0-informational.svg)](CHANGELOG.md)
 [![OWASP Top 10:2025](https://img.shields.io/badge/OWASP-Top%2010%3A2025-black.svg)](https://owasp.org/Top10/2025/)
 [![Claude Code plugin](https://img.shields.io/badge/Claude%20Code-plugin-d97757.svg)](https://code.claude.com/docs/en/plugins)
 

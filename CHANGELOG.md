@@ -1,9 +1,11 @@
 # Changelog
 
-## 0.2.2 — 2026-10-11
+## 1.0.0 — 2026-10-11
 
-A correctness and hardening release ahead of wider promotion: every command, skill, and prompt was
-reviewed line by line, and the plugin now ships an eval suite.
+First stable release. From here, command names, their arguments, and the finding format are
+stable — a change to any of them is a major version. Every command, skill, and prompt was reviewed
+line by line, the plugin now ships an eval suite, and this version was dogfooded with a full
+`/audit` of a production FastAPI application (171 routes) before release.
 
 ### Fixed
 - **`/authz` description was cut off.** An unquoted ` #` in its YAML frontmatter started a comment,
