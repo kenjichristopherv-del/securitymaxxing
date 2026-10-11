@@ -1,0 +1,6 @@
+schema_version: "1.1"
+name: clean-app-no-false-positives
+description: /audit on a deliberately clean JSON API. Guards against padded reports and the PBKDF2 false positive.
+tags: [smoke, audit, precision]
+context:
+  scaffold_script: scaffold.sh

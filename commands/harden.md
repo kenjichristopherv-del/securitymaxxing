@@ -1,7 +1,7 @@
 ---
 description: Review deployment and infrastructure config — Docker, Kubernetes, Terraform, cloud IAM, and logging readiness.
 argument-hint: "[infra path or platform] (optional)"
-allowed-tools: Read, Grep, Glob, Bash(rg:*), Bash(find:*), Bash(ls:*), Bash(git ls-files:*)
+allowed-tools: Read, Grep, Glob, Bash(git ls-files:*)
 ---
 
 # Infrastructure and deployment hardening
@@ -13,28 +13,35 @@ Scope: $ARGUMENTS
 
 Find the relevant files: `Dockerfile*`, `docker-compose*`, `*.tf`, `k8s/`/`*.yaml` manifests,
 Helm charts, `serverless.yml`, `.github/workflows/`, `Procfile`, `fly.toml`, `vercel.json`,
-`nginx.conf`/`Caddyfile`, systemd units, and any deploy script.
+`nginx.conf`/`Caddyfile`, systemd units, and any deploy script. Confirm what is actually tracked with
+`git ls-files -- '*.tfstate*' '.env*'`. For CI workflows, apply `/securitymaxxing:deps` §4
+(`pull_request_target`, SHA pinning, expression injection, token permissions).
 
 ## 1. Containers
 
 - **Running as root.** Is there a `USER` directive with a non-root UID? Default is root.
 - Base image: pinned by digest or by a mutable tag? Is it a slim/distroless variant, or a full
   OS with a package manager and shell the attacker can use?
-- Build secrets: `ARG`/`ENV` secrets persist in image layers even if later unset. Look for
-  `--mount=type=secret` or a multi-stage build instead.
+- Build secrets: `ARG`/`ENV` secrets persist in image layers even if later unset. Prefer BuildKit
+  `--mount=type=secret`; a multi-stage build only helps if the secret is confined to a discarded
+  stage.
 - Is the final image built from a multi-stage build, or does it ship build tools, source, `.git`,
   and dev dependencies?
 - `.dockerignore` — does the build context include `.env`, `.git`, or credentials?
 - Runtime flags: `--privileged`, `--cap-add=SYS_ADMIN`/`NET_ADMIN`, host network mode, the
-  Docker socket mounted into a container (that's root on the host — always a finding).
+  Docker socket mounted into a container (equivalent to root on the host — report it, rated by
+  what runs in that container and who can reach it).
 - Volume mounts: is the host filesystem mounted more broadly than needed, and writable?
 - Read-only root filesystem, dropped capabilities, `no-new-privileges`, seccomp/AppArmor profile.
 - Resource limits — an unbounded container is a host-wide DoS.
+- Compose `ports: "5432:5432"` publishes on 0.0.0.0, and Docker's iptables rules bypass
+  UFW/firewalld — bind to `127.0.0.1:` or omit `ports` for internal services.
 
 ## 2. Kubernetes
 
 - Pod security: `runAsNonRoot`, `readOnlyRootFilesystem`, `allowPrivilegeEscalation: false`,
-  dropped capabilities, no `hostPID`/`hostNetwork`/`hostPath`.
+  `seccompProfile: RuntimeDefault`, `capabilities.drop: ["ALL"]`, no `hostPID`/`hostNetwork`/`hostPath`,
+  and Pod Security Admission `restricted` labels on namespaces (PodSecurityPolicy was removed in 1.25).
 - RBAC: any `ClusterRole` with `*` verbs or resources; service accounts bound more broadly
   than needed; the default service account token auto-mounted into pods that don't need it.
 - Secrets: base64 in a manifest is **not encryption**. Is there sealed-secrets/external-secrets,
@@ -53,6 +60,8 @@ Helm charts, `serverless.yml`, `.github/workflows/`, `Procfile`, `fly.toml`, `ve
 - Default VPC/default security group usage; missing network segmentation between tiers.
 - Is the metadata service protected (IMDSv2 required)? IMDSv1 turns any SSRF into cloud
   credential theft — check this specifically if the app makes outbound requests to user URLs.
+  In Terraform, look for `metadata_options { http_tokens = "required", http_put_response_hop_limit = 1 }`
+  (hop limit 1 stops containers on the host from reaching IMDS).
 - Logging: CloudTrail/audit logs enabled, in a separate account or with object-lock, and
   actually retained.
 - Encryption at rest on volumes, buckets, databases, and backups.
@@ -64,7 +73,9 @@ Helm charts, `serverless.yml`, `.github/workflows/`, `Procfile`, `fly.toml`, `ve
   state contains plaintext secrets.
 - Hardcoded credentials in `.tf` files or `terraform.tfvars`.
 - Modules pulled from unpinned or untrusted sources.
-- Does CI run `terraform apply` with credentials that a PR from a fork could reach?
+- Does CI run `terraform plan` or `apply` on fork/untrusted PRs? `plan` executes code too
+  (`external` data sources, third-party providers) — plan credentials must be treated as apply
+  credentials. Is `.terraform.lock.hcl` committed?
 
 ## 5. Runtime configuration
 
@@ -105,3 +116,4 @@ should be verified directly.
 Close by printing one line — `→ Recommended next: …`:
 - IaC/config findings → `/securitymaxxing:fix`; live-console findings are manual — name them so they aren't missed.
 - Then `/securitymaxxing:ship-check` for the go/no-go.
+- Nothing material found → say so; `/securitymaxxing:ship-check` before launch.

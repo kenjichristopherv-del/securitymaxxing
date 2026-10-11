@@ -1,7 +1,7 @@
 ---
 description: "Plain-English safety check for AI-built apps: what could go wrong, how bad it'd be, and exactly what to fix first."
 argument-hint: "[what your app does] (optional)"
-allowed-tools: Read, Grep, Glob, Bash(git:*), Bash(rg:*), Bash(ls:*), Bash(find:*)
+allowed-tools: Read, Grep, Glob, Bash(git log:*), Bash(git ls-files:*)
 ---
 
 # Vibe check
@@ -36,24 +36,30 @@ apps:
 
 1. **Can a stranger read or change other people's data?** Find endpoints that take an ID from
    the URL or request body and check whether the code confirms the item belongs to the person
-   asking. This is the #1 real-world bug in AI-built apps, because the happy path works
+   asking. This is one of the most common real-world bugs in AI-built apps, because the happy path works
    perfectly and nothing looks wrong.
 2. **Is anything actually protected?** Is there a login, and is it checked on the *server* for
    every route that matters — or only hidden in the UI? Hiding a button hides nothing.
 3. **Are there passwords or API keys sitting in the code?** Check the files and the git history.
-   If the repo was ever public, treat those keys as stolen.
+   If the repo was ever public, treat those keys as stolen. (Use
+   `git log --all -S '<prefix>' --oneline --name-only` — never `-p`; redact anything you quote.)
 4. **Can someone break in through what they type?** User input reaching a database query, a
    shell command, a file path, or the page HTML without protection.
-5. **Are passwords stored properly?** Hashed with bcrypt/argon2 — not plain text, not "encrypted".
+5. **Are passwords stored properly?** Hashed with argon2, bcrypt, scrypt, or PBKDF2 (Django's
+   default is fine) — not plain text, not "encrypted", not MD5/SHA.
 6. **Can someone run up your bill?** No rate limits on signup, login, email, SMS, AI model
    calls, or file uploads. Someone will find it, and this is often the fastest way an indie
    app loses real money.
 7. **Is anything private accidentally public?** Open storage buckets, a database reachable from
    the internet, debug mode on, an admin page with no password, secrets shipped to the browser
    (anything named `NEXT_PUBLIC_*`/`VITE_*` is visible to everyone).
-8. **If it has an AI feature**: can a user make it do something it shouldn't — read other
+8. **If you use Supabase or Firebase**: the `anon`/public key in the browser is normal — it's
+   public by design. What protects your data is Row Level Security on *every* Supabase table, or
+   Firestore/Storage rules that aren't `allow read, write: if true`. Check each table has RLS
+   enabled with real policies, and that the `service_role` key never reaches the browser.
+9. **If it has an AI feature**: can a user make it do something it shouldn't — read other
    people's data, spend money, send emails, delete things?
-9. **If something goes wrong, would you know?** Any logging or alerting at all. Backups that
+10. **If something goes wrong, would you know?** Any logging or alerting at all. Backups that
    have been restored at least once.
 
 ## How to report
@@ -86,8 +92,7 @@ at there.
 
 A direct answer to the question they actually asked: **is this safe to put on the internet
 right now?** Yes, yes-with-these-two-fixes, or no-and-here's-the-one-thing. No hedging, no wall
-of caveats. Then offer `/securitymaxxing:fix` to do the repairs, or
-`/securitymaxxing:explain` if they want any finding broken down further.
+of caveats.
 
 ## Recommended next step
 

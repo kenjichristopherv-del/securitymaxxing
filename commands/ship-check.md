@@ -1,13 +1,13 @@
 ---
 description: Pre-launch security gate — is this actually safe to put on the internet? Blocking issues vs. things you can fix next week.
 argument-hint: "[what you're shipping] (optional)"
-allowed-tools: Read, Grep, Glob, Bash(git:*), Bash(rg:*), Bash(ls:*), Bash(find:*), Bash(cat:*)
+allowed-tools: Read, Grep, Glob, Bash(git log:*), Bash(git ls-files:*), Bash(npm audit:*), Bash(pnpm audit:*), Bash(yarn npm audit:*), Bash(pip-audit:*), Bash(govulncheck:*)
 ---
 
 # Ship check
 
 You are the last reviewer before this goes to production. Decide whether it ships. Follow
-`security-review-method`. **Read-only.**
+`security-review-method`. **Read-only** — never run `npm audit fix` or any install/upgrade.
 
 Shipping: $ARGUMENTS
 
@@ -19,15 +19,20 @@ say "do not ship" and name the one thing that has to change.
 Check each and report pass/fail with evidence.
 
 1. **A live secret is in the repository or in the build.** API keys, private keys, database
-   URLs with passwords, service-account JSON, `.env` committed. Check git history, not just
-   the working tree: `git log --all --diff-filter=A --name-only`. A secret in history is
-   leaked even if deleted from HEAD — it must be **rotated**.
+   URLs with passwords, service-account JSON, `.env` committed. Check git history for sensitive
+   filenames and content, not just the working tree
+   (`git log --all -S 'PRIVATE KEY-----' --oneline --name-only`,
+   `git log --all -G 'A(KIA|SIA)[0-9A-Z]{16}' --oneline --name-only`) — or defer to
+   `/securitymaxxing:secrets` for depth. Never use `-p` (it prints the secret). A secret in
+   history is leaked even if deleted from HEAD — it must be **rotated**.
 2. **An endpoint that handles user data has no authentication**, or authentication that can be
    bypassed by omitting a header, sending an empty token, or hitting an alternate route.
 3. **No authorization on user-scoped data.** Any endpoint where changing an ID in the request
    returns someone else's data. Verify at least the highest-value ones by reading the query.
 4. **Injection reachable from an unauthenticated endpoint.** SQL, command, or SSRF.
-5. **Passwords stored with anything other than bcrypt/scrypt/argon2**, or stored recoverably.
+5. **Passwords stored with anything other than argon2id, scrypt, bcrypt, or PBKDF2-HMAC-SHA256**
+   (≥600k iterations, per OWASP — a framework default such as Django's is fine), or stored
+   recoverably (plaintext, reversible encryption, fast hashes like MD5/SHA-*).
 6. **Debug mode, stack traces, or a dev/admin console enabled in the production config path.**
    Includes Django `DEBUG`, Flask debug, `graphiql`, Spring actuator, `/metrics` unauthenticated,
    source maps exposing server code, verbose error middleware.
@@ -35,7 +40,9 @@ Check each and report pass/fail with evidence.
    or weak credentials.
 8. **TLS is absent, terminated wrong, or verification is disabled** anywhere in the request path
    (`rejectUnauthorized: false`, `verify=False`, `InsecureSkipVerify`).
-9. **A known-exploited vulnerability in a direct dependency** with no compensating control.
+9. **A known-exploited vulnerability (CISA KEV) in a direct dependency**, or a transitive one
+   reachable from your code, with no compensating control. Run the ecosystem auditor if it's
+   installed; otherwise mark this "not verified — run `/securitymaxxing:deps`".
 10. **User uploads are served from the app's own origin without content-type control**, or
     stored in a path where they can be executed.
 
@@ -67,7 +74,12 @@ Security is also whether you'd survive the incident:
 
 ## Verdict
 
-Finish with exactly this:
+Verdict rules: any failed blocker → **DO NOT SHIP**. No failed blockers, but open should-fix
+items or a blocker that can only be confirmed outside the code → **SHIP WITH CONDITIONS** (list
+the conditions). Everything passes → **SHIP**.
+
+End the report with this block, followed by a one-line Coverage note and the
+→ Recommended next line:
 
 ```
 VERDICT: SHIP / SHIP WITH CONDITIONS / DO NOT SHIP
@@ -91,5 +103,6 @@ kind of unhelpful.
 ## Recommended next step
 
 Close by printing one line — `→ Recommended next: …`:
-- DO NOT SHIP / SHIP WITH CONDITIONS → `/securitymaxxing:fix` the blockers, then re-run `/securitymaxxing:ship-check` to confirm the gate is green.
+- DO NOT SHIP → `/securitymaxxing:fix` the blockers, then re-run `/securitymaxxing:ship-check` to confirm the gate is green.
+- SHIP WITH CONDITIONS → close the conditions (fix, or confirm manually), then ship.
 - SHIP → ship.

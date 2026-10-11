@@ -5,8 +5,9 @@ description: >
   building, modifying, or reviewing AI features: prompt construction, chat endpoints, agent
   loops, tool/function calling, MCP servers and clients, RAG and vector search, document
   ingestion for AI, model output handling, or AI-driven automation. Trigger on 'prompt
-  injection', 'jailbreak', 'agent', 'tool calling', 'function calling', 'RAG', 'embeddings',
-  'vector store', 'system prompt', 'MCP server', 'AI feature', or any use of an LLM SDK
+  injection', 'jailbreak', 'AI agent', 'agent loop', 'tool use', 'tool calling', 'function
+  calling', 'RAG', 'embeddings', 'vector store', 'system prompt for an LLM app', 'agent memory',
+  'multi-agent', 'MCP server', 'AI feature', or any use of an LLM SDK
   (OpenAI, Anthropic, Gemini, LangChain, LlamaIndex, Vercel AI SDK). Enforces the rule that
   security is implemented in code around the model, never in the prompt.
 ---
@@ -77,7 +78,8 @@ If both sides exist in one agent, that's a finding regardless of how good the pr
 Deletes, payments, transfers, outbound email, public posts, code execution, infrastructure
 changes, spending. Confirmation must show the human **the actual concrete action** — the real
 recipient, the real amount, the real file — not the model's summary of it, which the attacker
-also controls.
+also controls. Don't batch approvals or let the model phrase the confirmation, and keep
+confirmation prompts rare enough that users aren't trained to click through them.
 
 ### 5. Model output is untrusted input
 
@@ -117,10 +119,30 @@ surface.
 
 ### 10. Verify the supply chain
 
-Pin model versions and weights by hash. Avoid pickle-based model formats (`.bin`, `.pt`) —
-loading one executes code; prefer safetensors. Review MCP servers and third-party tools before
-granting them: a malicious **tool description** is itself an injection vector, since it goes
-straight into the model's context.
+Pin model versions and weights by hash. Avoid pickle-based model formats (`.pt`, `.pth`,
+`.ckpt`, `.pkl`, joblib, and PyTorch `.bin`) — loading one executes code; prefer safetensors,
+use `torch.load(..., weights_only=True)` (the default since PyTorch 2.6), and never set
+`trust_remote_code=True` on an unreviewed Hugging Face repo. Treat fine-tuning and embedding
+corpora as attacker-reachable: whoever can write to them can poison the model's behavior.
+
+Review MCP servers and third-party tools before granting them, and pin them by version or hash.
+A malicious **tool description** is itself an injection vector, since it goes straight into the
+model's context; a server can change its descriptions after approval (rug pull), and one
+server's descriptions can instruct the model about another server's tools (tool shadowing). If
+you build an MCP server: validate that incoming OAuth tokens were issued for *your* server
+(audience), never pass the client's token through to upstream APIs (confused deputy), and
+authorize every tool call per user.
+
+### 11. Persistent memory and multi-agent systems
+
+Anything an agent writes to long-term memory, a scratchpad, or a shared store is read back later
+as trusted context — so one poisoned document can plant an instruction that fires sessions
+later. Treat memory writes as untrusted input, scope memory per user and tenant, and let users
+inspect and clear it. Messages from another agent are untrusted input carrying *that* agent's
+authority, not yours: authenticate them, validate them against a schema, and never let one
+agent's output grant another agent new tools or credentials. Give each agent its own narrowly
+scoped identity rather than a shared service credential. Cap fan-out and add circuit breakers so
+one bad step can't cascade across a pipeline.
 
 ## When building any AI feature, state this explicitly
 
@@ -134,3 +156,14 @@ Keep a small set of injection payloads in CI against your actual prompts and too
 hidden in a retrieved document, a tool result that tells the model to call another tool with
 different arguments, a filename containing instructions, an attempt to get the model to emit a
 markdown image with data in the URL. This catches regressions when someone adds a tool later.
+
+## Coverage
+
+Maps to the OWASP Top 10 for LLM Applications 2025 (LLM01–LLM10) and the OWASP Top 10 for
+Agentic Applications 2026 (ASI01 Agent Goal Hijack, ASI02 Tool Misuse, ASI03 Identity &
+Privilege Abuse, ASI04 Agentic Supply Chain Vulnerabilities, ASI05 Unexpected Code Execution,
+ASI06 Memory & Context Poisoning, ASI07 Insecure Inter-Agent Communication, ASI08 Cascading
+Failures, ASI09 Human-Agent Trust Exploitation, ASI10 Rogue Agents). Rule 9 covers system prompt
+leakage (LLM07); rule 6 covers vector and embedding weaknesses (LLM08). For misinformation and
+overreliance (LLM09), never let model output be the sole basis for a consequential decision
+without a verification step a human or deterministic check performs.

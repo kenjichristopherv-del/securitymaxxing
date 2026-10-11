@@ -3,13 +3,23 @@
   "name": "securitymaxxing",
   "description": "Evidence-based application security tooling for Claude Code.",
   "owner": {
-    "name": "Kenji Tubera"
+    "name": "Kenji Tubera",
+    "url": "https://github.com/kenjichristopherv-del"
   },
   "plugins": [
     {
       "name": "securitymaxxing",
-      "description": "Evidence-based application security for Claude Code: audit commands that prove findings with file:line and exploit paths, plus skills that make Claude write secure code by default.",
+      "description": "Evidence-based application security for Claude Code: audit commands that prove findings with file:line and exploit paths, a redteam command that confirms them with working PoCs, LLM and agent security review, and skills that make Claude write secure code by default.",
+      "version": "0.2.2",
+      "author": {
+        "name": "Kenji Tubera",
+        "url": "https://github.com/kenjichristopherv-del"
+      },
+      "homepage": "https://github.com/kenjichristopherv-del/securitymaxxing",
+      "repository": "https://github.com/kenjichristopherv-del/securitymaxxing",
+      "license": "Apache-2.0",
       "category": "security",
+      "keywords": ["security", "appsec", "owasp", "llm-security", "red-team", "secure-coding"],
       "source": "./"
     }
   ]

@@ -1,7 +1,7 @@
 ---
 description: Full evidence-based security audit of the codebase — traced findings with file:line, exploit paths, severity, and patches.
 argument-hint: "[path or area, e.g. src/api or 'the auth flow'] (optional)"
-allowed-tools: Read, Grep, Glob, Bash(git log:*), Bash(git ls-files:*), Bash(git diff:*), Bash(cat:*), Bash(ls:*), Bash(find:*), Bash(rg:*), Bash(wc:*), TodoWrite
+allowed-tools: Read, Grep, Glob, Bash(git ls-files:*), Bash(git log:*), TodoWrite
 ---
 
 # Full security audit
@@ -58,19 +58,25 @@ Work through these. For each, state what you found **or** that you checked it an
   dynamic ORDER BY / table names, `$where` and operator injection in Mongo.
 - Command: `exec`, `execSync`, `system`, `popen`, `subprocess` with `shell=True`, backticks.
 - Path traversal: user input reaching `path.join`/`open`/`readFile` without containment.
-- SSRF: user-supplied URLs fetched server-side — check for cloud metadata (`169.254.169.254`),
-  internal ranges, `file://`/`gopher://` schemes, and redirect-following.
+- SSRF (OWASP A01:2025): user-supplied URLs fetched server-side — check for cloud metadata
+  (`169.254.169.254`), internal ranges, IPv6/IPv4-mapped and encoded-IP bypasses, DNS
+  rebinding, `file://`/`gopher://` schemes, and redirect-following.
 - Deserialization: `pickle`, `yaml.load`, Java native, PHP `unserialize`, `Marshal.load`.
+- XML parsers with external entities or DTDs enabled (XXE).
+- Prototype pollution: JS deep-merge or `set` of user-supplied objects (`__proto__`).
 - Template injection: user input concatenated into a template *string* rather than passed as data.
 - XSS: `dangerouslySetInnerHTML`, `innerHTML`, `v-html`, `|safe`, `Markup`, unescaped
   interpolation, `javascript:` URLs, and any place the framework's auto-escaping was opted out of.
+- Open redirect: `?next=`/`?returnTo=` reaching a redirect without an allowlist.
 
 **C. Authentication and session**
-- Password storage (bcrypt/scrypt/argon2 vs anything else), reset-token generation and
-  expiry, single-use enforcement, and whether reset links leak via Referer.
+- Password storage (argon2id/scrypt/bcrypt/PBKDF2 at OWASP-minimum parameters vs anything
+  else; bcrypt's 72-byte truncation), reset-token generation and expiry, single-use enforcement, and whether reset links leak via Referer.
 - JWT: algorithm confusion / `alg: none`, unverified `decode`, missing `exp`/`aud`/`iss`
   checks, secrets in the repo, no revocation path.
 - Session cookies: `HttpOnly`, `Secure`, `SameSite`, fixation on privilege change, lifetime.
+- CSRF on cookie-authenticated state-changing routes: a token or `Origin` check, or an
+  **explicit** `SameSite` (unset is Lax only in Chromium). Login CSRF.
 - MFA/OAuth: state parameter, PKCE, redirect_uri allowlist, token handling.
 - Rate limiting and lockout on login, reset, OTP, and any enumeration-prone endpoint. Check
   whether responses differ for existing vs non-existing accounts.
@@ -80,28 +86,45 @@ Work through these. For each, state what you found **or** that you checked it an
   Dockerfiles, CI workflows, and committed `.env` files.
 - Check whether anything sensitive is tracked by git that shouldn't be (`git ls-files`).
 - Debug flags, permissive CORS (`*` with credentials, or origin reflection), verbose errors,
-  exposed admin/metrics/actuator/graphiql endpoints in production paths.
+  exposed admin/metrics/actuator/graphiql endpoints in production paths. Missing headers on a
+  JSON API are not findings (see the anti-false-positive rules).
 
 **E. Data protection**
 - PII and secrets in logs, error reports, analytics events, or third-party telemetry.
 - Crypto misuse: ECB, static/reused IVs, `Math.random()` for tokens, MD5/SHA1 for passwords,
   homemade crypto, missing certificate verification.
 - What is stored that should not be stored at all (raw card data, full ID numbers, plaintext tokens).
+- Security logging and alerting (A09:2025): are auth failures, access-control denials, privilege
+  changes, and admin actions logged with actor and target, tamper-resistant, and wired to an
+  alert? Is log injection (CRLF in user data) possible?
 
 **F. Supply chain and CI**
-- Direct dependencies with known-vulnerable ranges; unpinned or wildcard versions;
-  install-time scripts; typosquat-shaped names.
-- CI: `pull_request_target` with checkout of untrusted head, secrets exposed to fork PRs,
-  unpinned third-party actions, artifacts leaking tokens.
+- Direct dependencies with known-vulnerable ranges — judge from manifests and lockfiles only,
+  never cite a CVE you aren't certain of, and defer a full scan to `/securitymaxxing:deps`. Is a
+  lockfile committed? Unpinned or wildcard versions, install-time scripts, typosquat-shaped names.
+- CI: `pull_request_target` with checkout of untrusted head, secrets exposed to fork PRs, script
+  injection via `${{ github.event.* }}` (issue/PR title, branch name, comment body) interpolated
+  into `run:`, `workflow_run` consuming untrusted artifacts, `permissions:` not least-privilege
+  (default `GITHUB_TOKEN` write), third-party actions pinned by tag rather than full commit SHA,
+  artifacts leaking tokens.
 
 **G. Business logic** (no scanner finds these — think like a fraudster)
 - Race conditions on balance, inventory, coupon redemption, quota.
 - Negative/overflow quantities and prices; currency and rounding abuse.
 - Workflow steps that can be skipped or replayed; idempotency on payment endpoints.
-- Webhook handlers that trust the payload without verifying a signature.
+- Webhook handlers that trust the payload without verifying a signature; replay with no
+  timestamp/nonce check; signatures compared with `==` rather than in constant time.
 
 **H. AI/LLM surfaces**, if present — prompt injection, tool/agent authority, output used as
-code or as an authorization decision. Cover these using the `llm-app-security` skill.
+code or as an authorization decision. Cover these using the `llm-app-security` skill (or run
+`/securitymaxxing:llm` for depth).
+
+**I. Exceptional conditions** (A10:2025)
+- Fail-open error handling: a `catch` that calls `next()` or allows, an authz, rate-limit, or
+  feature-flag service outage that grants access.
+- Uncaught exceptions and unhandled rejections that crash the process — one bad request is a DoS.
+- Missing timeouts; unbounded inputs (body size, pagination, decompression, ReDoS).
+- Errors that leak stack traces or leave partial state (non-atomic multi-step writes left half-done).
 
 ## Phase 3 — Verify before you report
 
@@ -127,7 +150,7 @@ Use the finding format from `security-review-method`. Structure:
    running system), and what a human should verify manually.
 5. **Do this first** — the top 3 fixes ranked by risk reduced per unit of effort.
 
-Then stop. Do not begin fixing. Offer `/securitymaxxing:fix` for remediation.
+Then stop. Do not begin fixing — the recommended-next line below says where to go.
 
 ## Recommended next step
 

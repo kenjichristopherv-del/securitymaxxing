@@ -108,7 +108,8 @@ movement? Cite the specific controls.
 
 ## 2. Access control
 
-*Broken access control is OWASP A01 and the most common serious flaw in real applications.
+*Broken access control is OWASP A01:2025 (which now also includes SSRF) and the most common
+serious flaw in real applications.
 Scanners cannot find it — the malicious request looks completely valid.*
 
 **2.1 — Endpoint inventory** *(do this before 2.2)*
@@ -170,6 +171,17 @@ flow that can be pointed at another org, an impersonation feature without proper
 a support tool with no authorization. Show the request for each.
 ```
 
+**2.7 — Fail-open on errors**
+```
+Find every place a security decision can be skipped by an error. Auth/authz middleware whose
+catch block calls next() or returns true; try/except around permission checks that swallows
+the exception; signature or token verification that returns null on error and is treated as
+"no restriction"; policy-engine, feature-flag, or remote-auth calls that default to allow on
+timeout; missing config values that disable a check; unhandled promise rejections inside
+guards. For each, show the input or condition that triggers the error and what the request can
+then do. (OWASP A10:2025 Mishandling of Exceptional Conditions.)
+```
+
 ---
 
 ## 3. Injection & untrusted input
@@ -178,8 +190,8 @@ a support tool with no authorization. Show the request for each.
 ```
 Trace untrusted input to dangerous sinks in this codebase. Sources include request path,
 query, body, headers, cookies, Host, uploaded file contents AND filenames, webhook payloads,
-imported files, third-party API responses, and database rows written by other users (second-
-order injection). Sinks: SQL/NoSQL queries, shell execution, filesystem paths, HTML/DOM
+imported files, third-party API responses, and database rows written by other users
+(second-order injection). Sinks: SQL/NoSQL queries, shell execution, filesystem paths, HTML/DOM
 insertion, template rendering, deserializers, outbound HTTP (SSRF), redirects, and eval.
 For each hit, walk backwards until you reach either a real source (report it) or a validated
 constant (don't). Show the full trace with a concrete payload.
@@ -188,11 +200,12 @@ constant (don't). Show the full trace with a concrete payload.
 **3.2 — SQL injection, including the ones ORMs don't stop**
 ```
 Find SQL injection. Cover: string concatenation and f-strings/template literals building
-queries; raw query escapes (knex.raw, Sequelize.literal, $queryRawUnsafe, session.execute
-(text(...))); ORM where clauses fed a whole request object; and — most importantly —
-DYNAMIC IDENTIFIERS: table names, column names, ORDER BY, and LIMIT built from user input.
-Those cannot be parameterized and are the injection that survives in codebases that "use an
-ORM everywhere". For NoSQL, check for operator injection ($ne, $gt, $where) from user
+queries; raw query escapes (knex.raw, Sequelize.literal, $queryRawUnsafe, $executeRawUnsafe,
+session.execute(text(...))); ORM where clauses fed a whole request object; and — most
+importantly — DYNAMIC IDENTIFIERS: table names, column names, and ORDER BY column/direction
+built from user input (plus LIMIT/OFFSET in drivers that emulate prepares). Identifiers cannot
+be parameterized, and they are the injection that survives in codebases that "use an ORM
+everywhere". For NoSQL, check for operator injection ($ne, $gt, $where) from user
 objects reaching find().
 ```
 
@@ -210,16 +223,19 @@ is used — a user-controlled filename starting with "-" becomes a flag to the u
 Find every place a URL from user input is fetched server-side: fetch, axios, requests,
 http.get, webhook registration, "import from URL", avatar fetchers, link preview generators,
 PDF or screenshot renderers, OIDC/OpenAPI discovery. For each, check: is there a host
-allowlist? Are loopback, link-local (169.254.169.254, metadata.google.internal), and RFC1918
-ranges blocked? Is the destination re-validated AFTER following redirects? Are non-HTTP
-schemes rejected? Is it vulnerable to DNS rebinding? Also tell me whether the cloud metadata
+allowlist? Are loopback, link-local (169.254.169.254, metadata.google.internal), RFC1918,
+CGNAT, and IPv6 equivalents (::1, fc00::/7, fe80::/10, IPv4-mapped ::ffff:) blocked, including
+decimal/octal/hex IP encodings? Is the destination re-validated AFTER following redirects? Are
+non-HTTP schemes rejected? Is DNS resolved once and the connection pinned to the validated IP,
+or does the client re-resolve (DNS rebinding)? (SSRF is filed under OWASP A01:2025.) Also tell me whether the cloud metadata
 service requires IMDSv2 — if not, any SSRF here becomes cloud credential theft.
 ```
 
 **3.5 — XSS**
 ```
 Find XSS. Check: innerHTML/outerHTML/insertAdjacentHTML/document.write;
-dangerouslySetInnerHTML, v-html, [innerHTML], {@html}; template escaping opt-outs (|safe,
+dangerouslySetInnerHTML, v-html, {@html}, Angular bypassSecurityTrust* (plain [innerHTML] is
+sanitized by Angular); template escaping opt-outs (|safe,
 {{{ }}}, Markup(), mark_safe, raw, html_safe); user data inside <script> blocks, inline
 event handlers, or URL attributes accepting javascript:/data:; server-rendered JSON embedded
 in HTML without escaping </script>; and reflected values in error pages, search results, and
@@ -232,14 +248,15 @@ already escapes by default and no finding exists.
 ```
 Find path traversal. Check every path.join / open / readFile / sendFile / res.download and
 every archive extraction (Zip Slip — entry names inside an archive are attacker-controlled
-paths). Verify containment is checked AFTER resolution (realpath starts-with the realpath'd
-base), not by textually blocking "../" — that's bypassed by URL encoding, unicode, and
+paths). Verify containment is checked AFTER resolution with a separator-aware test
+(commonpath / is_relative_to / path.relative — a bare startswith(base) accepts
+/srv/uploads_evil), not by textually blocking "../" — that's bypassed by URL encoding, unicode, and
 absolute paths. Also check whether the stored filename comes from the client.
 ```
 
 **3.7 — Deserialization, parsers, and templates**
 ```
-Find unsafe deserialization (pickle.loads, yaml.load without SafeLoader, Marshal.load, PHP
+Find unsafe deserialization (pickle.loads, yaml.load with an unsafe Loader, Ruby Marshal.load, PHP
 unserialize, Java ObjectInputStream, BinaryFormatter), XML parsers with external entities
 enabled (XXE), and server-side template injection — user input concatenated into a template
 STRING rather than passed as context (render_template_string, Handlebars.compile on user
@@ -261,8 +278,9 @@ check before reaching the sink.
 
 **4.1 — Full auth review**
 ```
-Review authentication end to end. Password storage (bcrypt/scrypt/argon2 only — flag any
-general-purpose hash, and check the work factor); constant-time comparison; password policy
+Review authentication end to end. Password storage (argon2id m>=19MiB t>=2 p=1, scrypt
+N>=2^17, bcrypt cost >=10 with the 72-byte truncation handled, or PBKDF2-HMAC-SHA256 >=600k
+iterations — flag any general-purpose hash and any weaker parameters); constant-time comparison; password policy
 including a breached-password check and no low maximum length; session storage, cookie flags
 (HttpOnly, Secure, SameSite, Domain scope), session regeneration on login and privilege
 change, server-side invalidation on logout, and whether a password change kills other
@@ -276,7 +294,8 @@ Review every JWT usage. Check: is the signature verified or merely decoded (look
 jwt.decode without a key, verify=False, a client-side decode library used server-side)? Is
 the algorithm PINNED, or taken from the token header (enabling alg:none and RS256->HS256
 confusion)? Are exp, nbf, iss, and aud all validated? How strong is the signing secret and
-where does it live? Is kid used to load a key from a path or database (injection)? Is there
+where does it live? Is kid used to load a key from a path or database (injection)? Are
+jku/x5u/embedded jwk headers ignored? Is there
 ANY revocation path? Are tokens in localStorage rather than an HttpOnly cookie — and is that
 tradeoff acknowledged?
 ```
@@ -338,6 +357,8 @@ strings.xml, and every .env variant.
 
 History: git ls-files for tracked .env/.pem/.key/credentials files; git log --all
 --diff-filter=A --name-only; git log --all -p -S for each secret pattern; and git stash list.
+Note that on GitHub, commits removed by force-push stay reachable by SHA and in forks and PR
+refs — another reason rotation is the only fix.
 
 Do NOT print full secret values — show location plus a redacted fingerprint.
 
@@ -396,9 +417,12 @@ Read the actual CORS config. Flag: wildcard origin with credentials; ORIGIN REFL
 (echoing back whatever Origin was sent, with credentials — a complete same-origin-policy
 bypass); regex allowlists with unescaped dots or missing anchors (/example\.com$/ matches
 evilexample.com); and "null" origin allowed.
-Then CSRF: find cookie-authenticated state-changing endpoints with no CSRF token and no
-SameSite protection. Check that protection covers PUT and DELETE, not just POST, and review
-every route exempted from CSRF middleware. Don't report CSRF on bearer-token APIs.
+Then CSRF: find cookie-authenticated state-changing endpoints with no CSRF token or
+Origin/Sec-Fetch-Site check. SameSite=Lax set explicitly reduces risk but does not cover
+sibling subdomains or state changes on GET, and browser default-Lax is Chromium-only — don't
+count it. Check JSON endpoints that also accept text/plain or form content types (no
+preflight), login CSRF, that protection covers PUT/PATCH/DELETE, and every route exempted from
+CSRF middleware. Don't report CSRF on bearer-token APIs.
 ```
 
 **6.4 — Security headers**
@@ -453,8 +477,8 @@ MD5/SHA-1 where collisions matter, and any general-purpose hash used for passwor
 AEAD (AES-GCM, ChaCha20-Poly1305) for symmetric encryption.
 Then the details that actually break it: IV/nonce reuse (a hardcoded or zero IV — GCM nonce
 reuse leaks the auth key); missing authentication on ciphertext; non-constant-time comparison
-of MACs, tokens, signatures, and API keys; and weak randomness — Math.random(), random.random
-(), rand(), or time-seeded PRNGs used for tokens, session IDs, reset codes, OTPs, salts,
+of MACs, tokens, signatures, and API keys; and weak randomness — Math.random(),
+random.random(), rand(), or time-seeded PRNGs used for tokens, session IDs, reset codes, OTPs, salts,
 nonces, or IVs. Flag any hand-rolled construction as a finding by default.
 ```
 
@@ -494,6 +518,8 @@ in backups, caches, search indexes, and third-party processors?
 
 ## 8. Dependencies & supply chain
 
+*Software Supply Chain Failures is its own category in OWASP Top 10:2025 (A03).*
+
 **8.1 — Triage, don't relay**
 ```
 Run the ecosystem's audit tool (npm audit / pip-audit / govulncheck / bundle audit /
@@ -509,7 +535,9 @@ say so and give the install command.
 **8.2 — Package trust & install scripts**
 ```
 Beyond known CVEs, assess supply-chain risk. Flag any dependency whose name is one character
-or transposition away from a popular package (typosquatting); packages with very few
+or transposition away from a popular package (typosquatting); packages that don't exist on the
+registry, or were registered very recently, with a name an AI assistant would plausibly
+hallucinate (slopsquatting); packages with very few
 downloads, a single maintainer, no repository link, or a recent ownership transfer;
 dependencies added recently (cross-reference git log on the manifest); and anything pulled
 from a git URL, tarball, or non-default registry. Most importantly, find preinstall/install/
@@ -642,17 +670,37 @@ already retrieved and one missed filter leaks across customers. Are indexes or n
 partitioned? Then data exposure: what ends up in prompts that shouldn't leave your
 infrastructure (PII, secrets, other tenants' data)? Does the provider retain or train on your
 data, and does that match your privacy policy? Are prompts and completions logged with PII in
-them?
+them? Is the system prompt treated as public (no secrets, no internal topology)?
 ```
 
 **10.6 — AI supply chain & abuse**
 ```
-Check: are model weights and versions pinned by hash? Any pickle-based model formats (.bin,
-.pt) that execute code on load, where safetensors would work? Have the MCP servers and
+Check: are model weights and versions pinned by hash? Any pickle-based model formats (.pt,
+.pth, .ckpt, .pkl, PyTorch .bin) that execute code on load where safetensors would work,
+torch.load without weights_only=True, or trust_remote_code=True? Have the MCP servers and
 third-party tools been reviewed — a malicious tool DESCRIPTION is itself an injection vector
 since it goes straight into the model's context. Then abuse: are there rate limits and
 per-user cost caps on model calls? Is this endpoint effectively a free proxy to a paid model
 that anyone can call?
+```
+
+**10.7 — Agent memory & multi-agent trust**
+```
+Does any agent persist memory, notes, or summaries that are read back into later context? Who
+can write to it, is it scoped per user/tenant, and can a poisoned document plant an
+instruction that fires in a later session? For multi-agent setups: does one agent's output
+become another agent's instructions or tool arguments without validation? Are agent-to-agent
+messages authenticated? Does each agent have its own scoped credentials, or a shared service
+key? Can one compromised step cascade through the pipeline?
+```
+
+**10.8 — MCP servers**
+```
+For every MCP server used or exposed: are server versions and tool definitions pinned so a
+description can't change after approval (rug pull)? Can one server's tool descriptions
+reference or override another's (tool shadowing)? If you host an MCP server: does it validate
+that tokens were issued for it (audience), avoid passing client tokens upstream (confused
+deputy), and authorize every tool call per user?
 ```
 
 ---
@@ -744,7 +792,8 @@ stops the launch:
 2. An endpoint handling user data with no authentication, or bypassable authentication
 3. No authorization on user-scoped data — changing an ID returns someone else's data
 4. Injection reachable from an unauthenticated endpoint
-5. Passwords stored with anything other than bcrypt/scrypt/argon2
+5. Passwords stored reversibly or with a fast general-purpose hash (MD5/SHA-*, salted or not)
+   instead of argon2id/scrypt/bcrypt/PBKDF2
 6. Debug mode, stack traces, or an admin/dev console enabled in the production config path
 7. A database or internal service reachable from the internet with weak credentials
 8. TLS absent or certificate verification disabled anywhere in the request path
@@ -782,7 +831,8 @@ ID in a URL or request? (2) is there a real login check on the SERVER for every 
 matters, not just hidden buttons in the UI? (3) are there passwords or API keys sitting in
 the code or in git history? (4) can someone break in through what they type — into a
 database query, a shell command, a file path, or the page HTML? (5) are passwords stored
-hashed with bcrypt or argon2? (6) can someone run up my bill — no rate limits on signup,
+hashed with a real password hash (argon2id, bcrypt, scrypt, or PBKDF2 — e.g. your
+framework's default), never plain or "encrypted"? (6) can someone run up my bill — no rate limits on signup,
 login, email, SMS, AI calls, or uploads? (7) is anything private accidentally public — open
 storage buckets, an internet-facing database, debug mode on, an admin page with no password,
 secrets shipped to the browser? (8) if it has an AI feature, can a user make it do something
@@ -952,7 +1002,7 @@ vulnerability can never silently come back, and the proof lives in CI instead of
 AI security review reads as a list of confident guesses.
 
 **One category at a time.** "Audit my whole app for everything" gets shallow coverage of
-everything. `/securitymaxxing:authz` on one module gets a real answer.
+everything. `/securitymaxxing:authz` (or prompts 2.1–2.7) on one module gets a real answer.
 
 **Make it argue with itself.** Run a review, then run prompt 12.3 on the results. The findings
 that survive are the ones worth your afternoon.

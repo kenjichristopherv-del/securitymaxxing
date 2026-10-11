@@ -1,9 +1,10 @@
 {
   "name": "securitymaxxing",
-  "description": "Evidence-based application security for Claude Code. Slash commands that audit your codebase for real, exploitable vulnerabilities (OWASP Top 10, API Top 10, LLM Top 10) with file:line proof and patches, plus skills that make Claude write secure code by default. Built for software engineers and vibe coders alike.",
-  "version": "0.2.1",
+  "description": "Evidence-based application security for Claude Code. Slash commands that audit your codebase for real, exploitable vulnerabilities (OWASP Top 10:2025, API Security Top 10, LLM Top 10 2025, Agentic Top 10 2026) with file:line proof and patches, a redteam command that proves findings with working PoCs against your own app, and skills that make Claude write secure code by default. Built for software engineers and vibe coders alike.",
+  "version": "0.2.2",
   "author": {
-    "name": "Kenji Tubera"
+    "name": "Kenji Tubera",
+    "url": "https://github.com/kenjichristopherv-del"
   },
   "homepage": "https://github.com/kenjichristopherv-del/securitymaxxing",
   "repository": "https://github.com/kenjichristopherv-del/securitymaxxing",
@@ -12,10 +13,18 @@
     "security",
     "appsec",
     "owasp",
+    "owasp-top-10",
     "code-review",
     "vulnerability",
     "threat-modeling",
     "secure-coding",
-    "prompt-injection"
+    "prompt-injection",
+    "llm-security",
+    "agent-security",
+    "mcp-security",
+    "red-team",
+    "secrets-detection",
+    "supply-chain",
+    "vibe-coding"
   ]
 }

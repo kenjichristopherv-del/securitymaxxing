@@ -1,12 +1,12 @@
 ---
 description: API and web surface review — CORS, CSRF, headers, rate limits, over-fetching, GraphQL, and file uploads.
 argument-hint: "[API path or spec file] (optional)"
-allowed-tools: Read, Grep, Glob, Bash(rg:*), Bash(find:*), Bash(git ls-files:*)
+allowed-tools: Read, Grep, Glob
 ---
 
 # API and web surface review
 
-Covers the OWASP API Security Top 10 concerns that aren't already handled by
+Covers the OWASP API Security Top 10 (2023) concerns that aren't already handled by
 `/securitymaxxing:authz` and `/securitymaxxing:authn`. Follow `security-review-method`. **Read-only.**
 
 Scope: $ARGUMENTS
@@ -35,6 +35,10 @@ that lie about auth requirements are themselves a finding.
 - Zip bombs, decompression bombs, and catastrophic regex (ReDoS) on user input.
 - Anything metered that costs you money per call: SMS, email, model tokens, third-party APIs.
   Cost-DoS is real and underrated.
+- **Exceptional conditions** (A10:2025): unhandled promise rejections or uncaught exceptions that
+  crash the process (one bad request = DoS), missing timeouts on outbound calls and database
+  queries, and error paths that fail open — a rate limiter or authz service outage that lets the
+  request through.
 
 ## 3. Rate limiting and abuse control
 
@@ -52,23 +56,31 @@ that lie about auth requirements are themselves a finding.
   this pairing, but the intent usually means the real config is origin reflection).
 - **Origin reflection**: echoing back whatever `Origin` was sent, with credentials — this is a
   total same-origin-policy bypass.
-- Regex allowlists with unescaped dots or missing anchors: `/example\.com$/` matches
-  `evilexample.com`; `/^https:\/\/.*\.example\.com/` may match `evil.com#.example.com`.
+- Regex allowlists with unescaped dots or missing anchors: `/^https:\/\/.*\.example\.com/`
+  (no `$`) matches `https://x.example.com.evil.net`; `/^https:\/\/www.example\.com$/`
+  (unescaped dot) matches `https://wwwxexample.com`; `/example\.com$/` or
+  `endsWith('example.com')` (no leading dot or anchor) matches `https://evilexample.com`.
 - `null` origin allowed (sandboxed iframes and some redirects send it).
 
 **CSRF** — only relevant where the browser attaches credentials automatically:
-- Cookie-authenticated state-changing endpoints without a CSRF token or `SameSite` protection.
+- Cookie-authenticated state-changing endpoints without a CSRF token, an `Origin`/`Sec-Fetch-Site`
+  check, or an **explicit** `SameSite=Lax|Strict` — an unset attribute is Lax only in Chromium
+  (with a 2-minute top-level-POST exception), not in Firefox or Safari. SameSite also does not stop
+  an attacker on a sibling subdomain (same-site).
+- JSON endpoints that also accept `text/plain` or `application/x-www-form-urlencoded` — no
+  preflight, so they are CSRF-able.
 - `SameSite=None` without a token.
 - Is CSRF protection applied to all methods including `PUT`/`DELETE`, or only `POST`?
 - Endpoints exempted from CSRF middleware — check each exemption is justified (webhooks
   usually are, if they verify signatures instead).
-- Bearer-token APIs don't need CSRF; don't report it there.
+- Bearer-token APIs don't need CSRF — unless the same endpoint also accepts a cookie session as
+  a fallback. Check that before dismissing it.
 
 ## 5. Security headers (browser-rendered apps)
 
 - **CSP** — present? Does it actually restrict scripts, or is it `unsafe-inline` +
   `unsafe-eval` + wildcards, i.e. decorative? Is `frame-ancestors` set?
-- `Strict-Transport-Security` with a meaningful max-age
+- `Strict-Transport-Security: max-age=31536000; includeSubDomains` (at least one year)
 - `X-Content-Type-Options: nosniff`
 - `Referrer-Policy` — prevents leaking URLs (and reset tokens) to third parties
 - `Permissions-Policy` for camera/mic/geolocation
@@ -77,7 +89,8 @@ that lie about auth requirements are themselves a finding.
 
 ## 6. GraphQL, if present
 
-- Introspection enabled in production?
+- Introspection enabled in production? (LOW/INFO on its own — the schema isn't a secret; it
+  matters only when it reveals unprotected sensitive operations.)
 - Query depth and complexity limits — without them, a nested query is a trivial DoS.
 - Batching abuse: aliased queries bypassing per-request rate limits (a login brute-force in one HTTP request).
 - Is authorization enforced **per field/resolver**, or only at the top-level query? Nested
@@ -103,11 +116,21 @@ that lie about auth requirements are themselves a finding.
 - Open redirects: any `?next=`/`?redirect=`/`?returnTo=` reaching a redirect without an
   allowlist. Used to make phishing links look legitimate and to steal OAuth codes.
 - HTTP method handling: does a `GET` perform a state change? Does an unexpected method skip
-  middleware?
+  middleware? Do `X-HTTP-Method-Override`/`_method` let a client change the verb past a
+  method-based guard?
 - Host header trust — used to build links, reset URLs, or cache keys.
 - Verb/path normalization differences between a proxy and the app (request smuggling, auth bypass
   via `//admin` or `/admin/./`).
-- Subdomain takeover: dangling DNS records pointing to deprovisioned services.
+- Subdomain takeover: only if DNS or IaC config is in the repo (Terraform/CloudFormation
+  `CNAME` records pointing at deprovisioned S3/Heroku/Azure/GitHub Pages resources); otherwise
+  list it under Coverage as needing a manual DNS check.
+- **Inventory** (API9:2023): old API versions (`/v1`, `/legacy`), beta/staging/debug routes, or
+  undocumented endpoints still mounted in production with weaker auth than the current version.
+- **SSRF** (API7:2023) — webhook URLs, URL import, callback URLs: trace with
+  `/securitymaxxing:injection`.
+- **Unsafe consumption of APIs** (API10:2023): are third-party and partner API responses
+  validated, size-limited, timeout-bounded, and fetched over verified TLS before being trusted
+  or stored?
 
 ## Report
 
@@ -120,3 +143,4 @@ JSON API shouldn't be dinged for missing CSP.
 Close by printing one line — `→ Recommended next: …`:
 - Provable issue (CORS reflection, upload, GraphQL authz) → `/securitymaxxing:redteam` to demonstrate it, then `/securitymaxxing:fix`.
 - Config or header gaps → `/securitymaxxing:fix`.
+- Clean → say so; `/securitymaxxing:ship-check` before launch.

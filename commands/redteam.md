@@ -1,7 +1,7 @@
 ---
 description: Prove it — build working proof-of-concept exploits for findings against your own app, and confirm defenses actually hold.
 argument-hint: "[finding, endpoint, or 'validate the last audit']"
-allowed-tools: Read, Grep, Glob, Bash, Write, TodoWrite
+allowed-tools: Read, Grep, Glob, Bash, Write, Edit, TodoWrite
 ---
 
 # Red team — validate by attacking
@@ -13,10 +13,15 @@ defended actually resist the attack.
 
 Target: $ARGUMENTS
 
+If empty, validate the findings from the most recent review in this conversation; if there are
+none, ask for a target.
+
 ## Authorization — read this first, every time
 
-This runs active attacks. That is legitimate **only** against systems the user owns or is
-explicitly authorized to test.
+This is the one securitymaxxing command that sends attack traffic. It is the explicit, scoped
+exception to the review method's rule — never run exploits during a review: active testing
+happens only here, only against systems the user owns or is authorized to test, and only after
+confirming the target in this session. Local or staging by default.
 
 - Confirm the target is the user's own application — local, a dev/staging instance, or a
   system they've stated they control. If it's ambiguous, **ask before sending a single request.**
@@ -30,6 +35,8 @@ explicitly authorized to test.
   unless the user explicitly asks.
 - Redact real secrets and real user data out of the transcript. Prove the leak by showing
   *that* data came back and its shape — not by dumping someone's PII.
+- **Never commit, push, or run destructive git or filesystem commands, and never modify
+  application source** — PoCs and tests only. Fixing is `/securitymaxxing:fix`'s job.
 
 If any of this can't be satisfied, fall back to a **static** proof: the exact request, the code
 path it hits, and the expected result — without sending it.
@@ -57,6 +64,9 @@ Figure out how to exercise the app safely and reproducibly:
 - For a live target, use `curl`/`httpie`/a scripted client with the user's own credentials or
   test tokens, never someone else's.
 
+Write throwaway PoCs to `.securitymaxxing/poc/` and tell the user to add it to `.gitignore`. Only
+place them in the project's test suite when the user agrees to keep them.
+
 State the harness you're using so the result is reproducible.
 
 ## Step 3 — Attack, per claim
@@ -67,22 +77,27 @@ Work the claim to a definite yes or no. Techniques, matched to the finding class
   ID; a leak is the victim's data in the response. Try read and write paths, nested and batch
   routes, and swapping IDs in every parameter, not just the obvious one.
 - **Injection** — send the payload, then confirm the *effect*, not just an error: a SQL payload
-  that returns an extra row or a boolean-based timing difference; a command payload that makes a
+  that returns an extra row, a boolean-based response difference, or a time-based delay; a
+  command payload that makes a
   benign observable side effect (a marker file, a DNS/HTTP callback to a host you control); a
   path payload that reads a file it shouldn't. Escalate from a harmless probe to a proof, and
-  stop at proof.
+  stop at proof. Use a callback listener the user controls, not a public OAST service, if any real
+  data could be in the callback.
 - **XSS** — confirm the payload survives into the response unescaped and executes in the DOM;
   for stored XSS, show it firing for a *second* account.
 - **SSRF** — prove the server fetched an internal target you chose (a callback listener, or a
-  benign internal endpoint), and note if cloud metadata was reachable — without exfiltrating
-  real credentials.
-- **Auth** — replay a token after logout, forge a JWT with `alg:none` or the pinned-algo swap,
-  reuse a reset token, brute the endpoint past where a limit should have stopped you.
+  benign internal endpoint), and note if cloud metadata was reachable — stop at the metadata
+  index or the role *name*; never request `security-credentials/<role>` or any token endpoint.
+- **Auth** — replay a token after logout, forge a JWT with `alg:none` or algorithm confusion
+  (re-sign an RS256 token as HS256 using the public key as the HMAC secret), reuse a reset token,
+  and exceed the expected rate limit by a small bounded margin (limit + a few) against your own
+  test account only — never against real users' accounts.
 - **Business logic / race** — fire N concurrent requests and show the invariant broke (balance
   went negative, the coupon redeemed twice, inventory oversold).
-- **Secrets** — confirm a discovered credential is *currently valid* with a single minimal,
-  read-only authenticated call to its provider, then state it must be rotated. Don't exercise it
-  further.
+- **Secrets** — only with the user's explicit confirmation that the credential belongs to them
+  or their org: make a single minimal, read-only identity call (e.g. `aws sts get-caller-identity`,
+  GitHub `GET /user`), passing the secret via an environment variable — never as a literal in the
+  command, never echoed. Then state it must be rotated. Don't exercise it further.
 
 For each, capture the exact request sent and the exact response that proves (or disproves) the claim.
 

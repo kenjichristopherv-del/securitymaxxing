@@ -1,7 +1,7 @@
 ---
 description: STRIDE threat model of the system's design — trust boundaries, attacker goals, and the controls that are missing.
 argument-hint: "[system, feature, or design doc to model] (optional)"
-allowed-tools: Read, Grep, Glob, Bash(git ls-files:*), Bash(find:*), Bash(rg:*), Write
+allowed-tools: Read, Grep, Glob, Write
 ---
 
 # Threat model
@@ -27,14 +27,15 @@ cannot infer.
   privileged/admin user, an internal operator, a third-party integration, a compromised
   dependency, an insider. Include the ones people don't like to list.
 - **What is the deployment reality?** Public internet, VPC, on-prem, mobile client, desktop
-  app, air-gapped vessel/edge device. This changes which threats are credible.
+  app, air-gapped or edge device. This changes which threats are credible.
 
 ## Step 2 — Draw the data flow and mark the trust boundaries
 
 Produce a diagram as a Mermaid `flowchart`, showing external entities, processes, data stores,
 and the flows between them. Mark every **trust boundary** crossing explicitly — that is where
 threats live. Typical boundaries: internet→edge, edge→app, app→database, app→third party,
-tenant→tenant, user→admin, host→container, client→server.
+tenant→tenant, user→admin, host→container, client→server. Draw each trust zone as a `subgraph`
+so boundary crossings are visible.
 
 For each boundary, state what enforces it today.
 
@@ -56,6 +57,8 @@ don't apply and say why — don't pad.
 
 For each threat: **Likelihood** (how motivated and capable must the attacker be? is it
 scriptable?) × **Impact** (which ranked asset, how badly) → Critical / High / Medium / Low.
+(This replaces the review-method rubric, because threats here are missing controls, not traced
+exploits.)
 
 Then state, per threat:
 - **Existing control** — what actually stops or limits it today, cited to `file:line` or config
@@ -80,11 +83,14 @@ Output:
 7. **Assumptions** — everything you inferred rather than confirmed. A threat model built on
    silent assumptions is how systems get owned.
 
-Offer to save this to `docs/threat-model.md`. Ask before writing.
+Offer to save this to `docs/threat-model.md`. Ask before writing; if the file exists, show what
+will change and don't overwrite without confirmation. Write nothing else.
 
 ## Recommended next step
 
 Close by printing one line — `→ Recommended next: …`: verify the top risks against the code —
 `/securitymaxxing:authz`, `/securitymaxxing:injection`, or `/securitymaxxing:authn` for the
-app-layer ones, `/securitymaxxing:harden` for the infra ones. A threat model is a list of
-hypotheses until the code confirms each.
+app-layer ones, `/securitymaxxing:harden` for the infra ones, `/securitymaxxing:llm` for AI/agent
+components, `/securitymaxxing:deps` for supply-chain threats, `/securitymaxxing:secrets` for
+credential-handling threats. A threat model is a list of hypotheses until the code confirms each.
+If no top risk is left open, say so and point at `/securitymaxxing:ship-check`.

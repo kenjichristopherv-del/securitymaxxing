@@ -6,10 +6,14 @@ allowed-tools: Read, Grep, Glob, Edit, Write, Bash, TodoWrite
 
 # Remediate security findings
 
-This is the only securitymaxxing command that writes code. Fix what is confirmed, verify each
-change, and don't break the application in the name of securing it.
+This and `/securitymaxxing:help` are the only securitymaxxing commands that modify application
+code (`redteam` may add PoC tests; `threat-model` may save a doc on request). Fix what is
+confirmed, verify each change, and don't break the application in the name of securing it.
 
 To fix: $ARGUMENTS
+
+If empty, take the confirmed findings from this conversation, CRITICAL first; if there are none,
+ask which finding to fix.
 
 ## Before touching anything
 
@@ -18,9 +22,13 @@ To fix: $ARGUMENTS
    yourself first — do not patch a false positive. Say so and stop if it isn't real.
 2. **Check the working tree is clean** (`git status`). If there are uncommitted changes,
    tell the user before editing so their work isn't tangled with security patches.
-3. **Order the work by severity**, and build a TodoWrite list. Fix one finding per change.
+3. **Order the work by severity**, and build a TodoWrite list. Fix one finding (one
+   vulnerability class) per change.
 4. **If a leaked secret is involved, rotation comes first.** Say this explicitly and do not
    let a code edit be mistaken for the fix — the secret is still valid until it is revoked.
+5. **Never run destructive git or filesystem commands** (`reset --hard`, `checkout --`,
+   `clean -fd`, `stash drop`, `push --force`, `filter-repo`/BFG), and never rotate or revoke
+   credentials yourself. History rewriting and rotation are human decisions.
 
 ## How to fix
 
@@ -85,6 +93,8 @@ rather than choosing silently.
 
 ## Recommended next step
 
-Close by printing one line — `→ Recommended next: …`: re-run the review command that surfaced the
-finding (e.g. `/securitymaxxing:authz`) to confirm it now comes back clean, and
-`/securitymaxxing:diff` before you commit.
+Close by printing one line — `→ Recommended next: …`:
+- Fixed → re-run the review command that surfaced the finding (e.g. `/securitymaxxing:authz`) to
+  confirm it now comes back clean, and `/securitymaxxing:diff` before you commit.
+- The finding turned out not to be real → say so; nothing to fix, back to the review.
+- Rotation or other human action pending → name it as the next step, before anything else.

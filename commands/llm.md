@@ -1,7 +1,7 @@
 ---
 description: Security review of AI/LLM features — prompt injection, agent tool authority, RAG poisoning, and unsafe model output handling.
 argument-hint: "[AI feature, agent, or path] (optional)"
-allowed-tools: Read, Grep, Glob, Bash(rg:*), Bash(find:*), Bash(git ls-files:*)
+allowed-tools: Read, Grep, Glob
 ---
 
 # LLM and AI feature security review
@@ -55,10 +55,13 @@ Then check:
   ID the model supplied?** If the model passes `user_id` and the tool trusts it, injection
   becomes account takeover. The user's identity must come from the session, never from the
   model's arguments.
+- **What credentials does the agent act with?** A shared service account, or a user OAuth token
+  with broad scopes, means any hijack inherits all of it — scope credentials per user, per task,
+  short-lived. (ASI03)
 - Are tool arguments validated and constrained (schema, allowlist, range) before execution?
-- Is there a tool that reads private data **and** a tool that can send data outward? That
-  combination is an exfiltration channel; injection turns it into a data breach. The classic
-  form is rendering a markdown image whose URL contains the stolen data.
+- **Private data + untrusted content + an outbound channel in one agent is the exfiltration
+  triad**; injection turns it into a breach. Outbound includes markdown images, link unfurling in
+  Slack/Teams, auto-fetched URLs, and any HTTP/email tool.
 - Can the model trigger irreversible or costly actions — delete, transfer funds, send email,
   post publicly, spend API credits, run code, execute a shell command, write to a repo?
   Which require a human confirmation, and is that confirmation showing the human enough to
@@ -74,6 +77,8 @@ Model output is untrusted data — treat it exactly like a request body:
 - Rendered as HTML/markdown → XSS. Is it sanitized? Are `javascript:`/`data:` URLs and remote
   image loads (exfiltration) blocked?
 - Used to build SQL, shell commands, file paths, or URLs → injection. Parameterize.
+- Used as a URL the server fetches → SSRF. Validate the destination; block internal ranges and
+  cloud metadata.
 - `eval`'d, or written to a file that later executes → RCE.
 - Used as an **authorization decision** ("the model said this user is an admin") → broken by design.
 - Parsed as JSON without schema validation → downstream type confusion.
@@ -93,13 +98,23 @@ Model output is untrusted data — treat it exactly like a request body:
 - Provider data handling: does the vendor train on your data? Is there a zero-retention or
   enterprise agreement? Is that consistent with what your privacy policy tells users?
 - Are prompts and completions logged, and do those logs contain user PII or credentials?
+- **Persistent memory / context poisoning** (LLM04, ASI06): does the agent write to long-term
+  memory, a shared knowledge base, or a vector store from untrusted content? One injected write
+  then attacks every future session. Who can write to RAG ingestion and fine-tuning data?
+- Embeddings of sensitive text (LLM08): are they exposed or shared? Embedding inversion can
+  recover the source text.
 
 ## 5. Supply chain and integrity
 
 - Where do models, adapters, and embeddings come from? Are downloaded weights pinned by hash?
-- Model files in unsafe formats — a pickle-based `.bin`/`.pt` executes code on load; prefer safetensors.
+- Model files in unsafe formats — pickle-based `.bin`/`.pt`/`.pkl` execute code on load; prefer
+  safetensors, and `torch.load(..., weights_only=True)` (the default since PyTorch 2.6 — flag an
+  explicit `weights_only=False`). Flag `trust_remote_code=True` in Hugging Face loaders: it runs
+  arbitrary code from the model repo.
 - MCP servers and third-party tool integrations: who wrote them, what do they have access to,
   and can a malicious tool description itself act as an injection vector against your agent?
+  Tool descriptions can change after approval (rug pull) — are they pinned and reviewed per
+  version? Does an MCP server pass the user's token through to downstream APIs (confused deputy)?
 - Are third-party plugins/tools reviewed before being granted to the model?
 
 ## 6. Abuse, cost, and safety
@@ -110,10 +125,28 @@ Model output is untrusted data — treat it exactly like a request body:
 - Content safety: what happens if the model produces harmful output in your product's voice?
 - Is model behavior tested against a set of known injection payloads in CI?
 
+## 7. Multi-agent and reliance
+
+- **Inter-agent messages** (ASI07): authenticated, and treated as untrusted input by the receiver?
+  One agent's output must not grant another agent new tools.
+- **Cascading failure** (ASI08): can one agent's bad output trigger irreversible actions in
+  another without a check? Is fan-out capped?
+- **Misinformation / overreliance** (LLM09): is model output presented as authoritative — legal,
+  medical, financial, or code that is auto-merged — without verification?
+- **Human-agent trust exploitation** (ASI09): can the model's persuasive output get a human to
+  approve a harmful action? Are confirmations batched or phrased by the model?
+
 ## Report
 
 Standard finding format. For each finding, state the injection vector, what the model can do
 with it, and the **code-level** control that fixes it — not a prompt-level mitigation.
+
+For `Class:`, use OWASP Top 10 for LLM Applications 2025 IDs (e.g. `LLM01:2025 Prompt Injection`,
+`LLM05:2025 Improper Output Handling`, `LLM06:2025 Excessive Agency`) and, for agents, OWASP Top 10
+for Agentic Applications 2026 IDs: ASI01 Agent Goal Hijack, ASI02 Tool Misuse, ASI03 Identity &
+Privilege Abuse, ASI04 Agentic Supply Chain Vulnerabilities, ASI05 Unexpected Code Execution, ASI06
+Memory & Context Poisoning, ASI07 Insecure Inter-Agent Communication, ASI08 Cascading Failures,
+ASI09 Human-Agent Trust Exploitation, ASI10 Rogue Agents.
 
 Include the tool-authority table. Close with a blunt statement of the worst case: "if an
 attacker fully controls the model's behavior, they can ______." That sentence is the real
@@ -123,3 +156,4 @@ security posture of an AI feature.
 
 Close by printing one line — `→ Recommended next: …`:
 - Injectable surface or over-powered tool → `/securitymaxxing:redteam` with injection payloads to prove the authority, then `/securitymaxxing:fix` — in code, never in the prompt.
+- No injectable path with meaningful authority → say so; `/securitymaxxing:ship-check`.

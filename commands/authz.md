@@ -1,13 +1,13 @@
 ---
-description: Hunt broken access control — IDOR, missing role checks, mass assignment, and tenant isolation gaps. The #1 cause of real breaches.
+description: "Hunt broken access control — IDOR, missing role checks, mass assignment, and tenant isolation gaps. OWASP A01, and invisible to scanners."
 argument-hint: "[path, route, or resource] (optional)"
-allowed-tools: Read, Grep, Glob, Bash(rg:*), Bash(git ls-files:*), Bash(find:*)
+allowed-tools: Read, Grep, Glob, Bash(git log:*)
 ---
 
 # Access control review
 
-Broken access control is OWASP A01 and the single most common serious flaw in real
-applications, because it is invisible to scanners — the request looks perfectly valid, it just
+Broken access control is OWASP A01:2025 (which now also absorbs SSRF — trace that with
+`/securitymaxxing:injection`) and the single most common serious flaw in real applications, because it is invisible to scanners — the request looks perfectly valid, it just
 belongs to someone else. Follow `security-review-method`. **Read-only.**
 
 Scope: $ARGUMENTS
@@ -39,8 +39,14 @@ class, policy layer. Then look specifically for:
 - An allowlist of unauthenticated paths that is broader than intended (prefix matching where
   `/api/public` also matches `/api/publicadmin`, or a `startswith` check an attacker can satisfy)
 - Middleware ordering bugs: a route handler that runs before the auth middleware
-- New routes added recently that don't match the codebase's established guard pattern
+- Routes that don't match the codebase's established guard pattern (if git history is
+  available, `git log` the route directories and prioritise recently added ones)
 - Static file or proxy rules that serve protected content around the app entirely
+- Framework-edge-only authorization: checks living only in Next.js `middleware.ts` or edge
+  rewrites are bypassable (CVE-2025-29927, `x-middleware-subrequest`) — authorization must also
+  be enforced in the route handler or data layer
+- Path and verb confusion: case (`/Admin`), trailing slash, `//admin`, `;jsessionid`,
+  URL-encoding, and `X-HTTP-Method-Override` / `_method` reaching a route the guard didn't match
 
 ### 3. Object-level authorization (IDOR) — check endpoint by endpoint
 
@@ -78,6 +84,9 @@ Also check:
 - Is the role read from the session/database, or from a client-supplied token claim, header,
   or request body field? A role in a JWT is only as good as the signature verification — check it.
 - Are there routes that check *authentication* but forgot *authorization*?
+- **Fail-open checks** (A10:2025): a policy or guard that throws and is caught with
+  `catch { next() }` or `except: pass`, a default `allow` branch, or a permissions lookup whose
+  error path grants access. Authorization must deny by default on any exception.
 
 ### 5. Field-level: mass assignment / over-posting
 
@@ -102,7 +111,9 @@ Denylists are not a fix — allowlist the writable fields.
 - Check background jobs, exports, admin tooling, search indexes, and caches — tenant leakage
   through a shared cache key or a global search index is common and severe.
 - If the app uses Postgres RLS: confirm policies exist **and** that the application connects as
-  a role that RLS actually applies to. A superuser or table owner bypasses RLS silently.
+  a role that RLS actually applies to. A superuser, a role with `BYPASSRLS`, or the table owner
+  (unless the table has `FORCE ROW LEVEL SECURITY`) bypasses RLS silently. On Supabase, confirm
+  the `service_role` key never reaches the client.
 
 ## Report
 
@@ -119,3 +130,4 @@ default.
 Close by printing one line — `→ Recommended next: …`:
 - IDOR or broken access confirmed → `/securitymaxxing:redteam` (spin up attacker + victim accounts to prove the cross-user read/write), then `/securitymaxxing:fix`.
 - Clean but authorization is held by convention → `/securitymaxxing:fix` to build the structural guardrail you recommended.
+- Clean and enforced by construction → say so; `/securitymaxxing:api` for the rest of the surface, or `/securitymaxxing:ship-check`.

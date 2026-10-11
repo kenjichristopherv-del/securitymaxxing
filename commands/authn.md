@@ -1,7 +1,7 @@
 ---
 description: Review authentication, sessions, JWTs, password handling, OAuth, and account recovery — the paths attackers hit first.
 argument-hint: "[auth module or flow] (optional)"
-allowed-tools: Read, Grep, Glob, Bash(rg:*), Bash(find:*), Bash(git ls-files:*)
+allowed-tools: Read, Grep, Glob, Bash(git ls-files:*)
 ---
 
 # Authentication and session review
@@ -16,9 +16,15 @@ token verification, session handling, and what the app trusts from the provider.
 
 ## 1. Credential storage
 
-- Password hashing: **bcrypt, scrypt, or argon2id** only. Flag MD5, SHA-1, SHA-256 (even
-  salted), a single round of anything, or a homemade scheme. Check the work factor/cost
-  parameter is current, not a 2012 default.
+- Password hashing: **argon2id, scrypt, bcrypt, or PBKDF2-HMAC-SHA256** (the FIPS option).
+  Flag MD5, SHA-1, SHA-256/512 (even salted), a single round of anything, or a homemade scheme.
+  Check parameters against the OWASP minimums: argon2id m≥19 MiB, t≥2, p=1; scrypt N≥2^17,
+  r=8, p=1; bcrypt cost ≥10; PBKDF2-HMAC-SHA256 ≥600,000 iterations. A framework's current
+  default (Django, Laravel, Devise) is fine — don't flag it.
+- bcrypt only uses the first **72 bytes** of input, and most libraries truncate silently. Flag
+  bcrypt over concatenated inputs (e.g. a `userId + username + password` cache key — the 2024
+  Okta bypass) and pre-hashing that feeds a raw binary digest (a NUL byte truncates). A pre-hash
+  must be base64/hex-encoded, ideally an HMAC with a pepper.
 - Is the comparison constant-time? (`bcrypt.compare` is; `hash == stored` on a raw digest isn't.)
 - Any password stored recoverably (encrypted rather than hashed) — that is a finding on its own.
 - Password policy: minimum length (length beats character classes), a check against known
@@ -30,7 +36,9 @@ token verification, session handling, and what the app trusts from the provider.
 
 - Where does session state live — server-side store, signed cookie, or JWT? Each has a
   different revocation story; find out whether revocation is possible at all.
-- Cookie flags: `HttpOnly`, `Secure`, `SameSite` (Lax or Strict), correct `Domain` scope
+- Cookie flags: `HttpOnly`, `Secure`, `SameSite` set **explicitly** (Lax or Strict) — an unset
+  attribute is treated as Lax only in Chromium (with a 2-minute top-level-POST exception), not in
+  Firefox or Safari. Prefer the `__Host-` prefix (forces `Secure`, `Path=/`, no `Domain`). Correct `Domain` scope
   (avoid a parent domain shared with untrusted subdomains), and a sane `Max-Age`.
 - **Session fixation**: is the session ID regenerated on login and on privilege change?
 - Is the session invalidated on logout **server-side**, or does logout only clear the cookie?
@@ -42,15 +50,19 @@ token verification, session handling, and what the app trusts from the provider.
 
 If JWTs are used, check every one of these:
 
-- Is the signature **verified**, not just decoded? Grep for `jwt.decode` without a key,
-  `decode(token, verify=False)`, `jwtDecode` from a client library used server-side.
+- Is the signature **verified**, not just decoded? Grep for `jwt.decode(` in `jsonwebtoken`
+  (which never verifies), PyJWT `options={"verify_signature": False}` (or 1.x `verify=False`),
+  `jose.decodeJwt`, and `jwtDecode`/`jwt-decode` used server-side.
 - Is the algorithm pinned? Accepting the token's own `alg` header enables `alg: none` and
-  RS256→HS256 confusion (signing with the public key as an HMAC secret).
+  RS256→HS256 confusion (signing with the public key as an HMAC secret). Check the library
+  version before reporting: `jsonwebtoken` ≥9 rejects `none` unless explicitly allowed and
+  restricts algorithms by key type; PyJWT 2 requires `algorithms=`. Report only if the code
+  actually passes the token's `alg` through or allowlists an unsafe one.
 - Are `exp`, `nbf`, `iss`, and `aud` all validated? Missing `exp` means a stolen token is
   valid forever.
 - Where is the signing secret, and is it strong? A short or committed HMAC secret is brute-forceable.
 - Key rotation and `kid` handling — is `kid` used to load a key from a path or database
-  (injection risk)?
+  (injection risk)? Are `jku`/`x5u`/embedded `jwk` headers honoured (an attacker-supplied key)?
 - **Revocation**: is there any way to kill a token before it expires? If not, keep access
   tokens short-lived with refresh rotation.
 - Are tokens stored in `localStorage` (XSS-readable) rather than an `HttpOnly` cookie? State
@@ -63,6 +75,8 @@ Password reset is usually the weakest link in an otherwise solid auth system.
 - Token generation: CSPRNG with sufficient entropy, not a UUIDv1, timestamp, or user-ID hash.
 - Token lifetime short (≤1h) and **single-use**, invalidated after use or after a password change.
 - Is the token compared in constant time, and looked up correctly (not `startswith`/prefix match)?
+- Are reset tokens stored **hashed** (SHA-256 is fine for high-entropy tokens), so a database
+  read doesn't yield live reset links?
 - Is the reset link sent only to the registered address, with the host taken from config —
   **not from the `Host` header** (host header injection sends the reset link to the attacker)?
 - Does resetting invalidate all existing sessions?
@@ -79,14 +93,20 @@ Password reset is usually the weakest link in an otherwise solid auth system.
 - Account lockout policy — and whether lockout itself is a DoS against real users.
 - OTP/2FA codes: length, expiry, attempt limit, single-use, not reusable across sessions.
 - Is there anything stopping automated credential stuffing (bot detection, proof of work, CAPTCHA)?
+- **Logging and alerting** (A09:2025): are auth events logged — login success/failure, reset
+  requested/completed, MFA enrolled/removed, email/password change, admin impersonation —
+  **without** logging the password or token, and is anything alerted on (failure spikes, MFA removal)?
 
 ## 6. OAuth / OIDC / SSO integration
 
 - Is the `state` parameter generated, stored, and verified (CSRF on the callback)?
-- Is PKCE used for public clients?
+- Is PKCE (S256) used — required for public clients, recommended for confidential clients too
+  (RFC 9700)? Is the implicit flow or ROPC in use (both deprecated)?
 - Is `redirect_uri` matched against an exact allowlist — no wildcard, no prefix match, no
   open redirect chained through it?
 - Is the ID token's signature, `iss`, `aud`, and `nonce` verified?
+- Are users keyed on `iss` + `sub` — never on `email`, `preferred_username`, or `upn`? Those
+  claims are mutable (the Entra "nOAuth" takeover).
 - **Account linking**: does the app link accounts by email without verifying the provider
   verified that email? That's a full takeover primitive — sign up with a victim's email at a
   provider that doesn't verify, then link.
@@ -96,6 +116,9 @@ Password reset is usually the weakest link in an otherwise solid auth system.
 
 - Is `req.user` populated from a verified session on every request, or ever from a header
   or body field the client controls?
+- **Fail-open auth middleware** (A10:2025): token or session verification wrapped in a
+  `try`/`catch` that logs and calls `next()`, a verification error or provider timeout treated
+  as anonymous-but-allowed, or `req.user` defaulting to a privileged object.
 - Impersonation / "log in as user" admin features: authorized, audited, time-limited, and
   clearly indicated?
 - Service-to-service auth: shared static secrets, mTLS, or nothing?

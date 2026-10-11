@@ -4,9 +4,10 @@ description: >
   The evidence discipline for any security review, audit, threat model, or vulnerability
   triage. Use this skill whenever performing or reporting on application security work:
   auditing code for vulnerabilities, reviewing a diff or PR for security impact, triaging
-  a scanner result, judging whether a finding is real, or assigning severity. Trigger on
+  a scanner result, judging whether a finding is real, or assigning security severity. Trigger on
   'security review', 'security audit', 'is this vulnerable', 'pentest my code', 'find
-  vulnerabilities', 'CVE', 'CWE', 'OWASP', 'severity', 'false positive', 'exploitable'.
+  vulnerabilities', 'CVE', 'CWE', 'OWASP', 'vulnerability severity', 'false positive',
+  'exploitable'.
   Defines the source-to-sink proof requirement, the severity rubric, the finding format,
   and the anti-false-positive rules that every securitymaxxing command depends on.
 ---
@@ -25,11 +26,13 @@ You must be able to name both ends:
 
 - **Source** — where attacker-controlled data enters. HTTP body/query/path/header, cookie,
   uploaded file, webhook payload, message queue, third-party API response, database row that
-  another user wrote, environment of a multi-tenant runtime, LLM output derived from any of
+  another user wrote, environment variables or files writable by another tenant in a shared runtime, LLM output derived from any of
   the above.
 - **Sink** — where it does damage. SQL/NoSQL/ORM raw query, shell/`exec`/`spawn`, filesystem
   path, HTML/DOM insertion, template render, deserializer, HTTP client (SSRF), redirect
-  target, auth/authz decision, price/quantity/role field, log line, `eval`.
+  target, auth/authz decision, price/quantity/role field, log line, `eval` — and **error
+  paths**: a `catch`/`except` or timeout inside an auth, authz, signature, or validation check
+  that falls through to allow (fail-open, OWASP A10:2025).
 
 If you cannot name both, you do not have a finding. You have a hypothesis — report it as
 **Needs verification** and state exactly what you'd need to read to settle it.
@@ -39,7 +42,9 @@ If you cannot name both, you do not have a finding. You have a hypothesis — re
 These exist because the default failure mode of AI security review is confident nonsense.
 
 1. **Check the mitigation before you write the finding.** Parameterized queries, ORM binding,
-   framework auto-escaping, `SameSite=Lax` by default, CSRF middleware already mounted,
+   framework auto-escaping, an explicitly set `SameSite=Lax/Strict` session cookie (browser
+   default-Lax is not a mitigation — it is Chromium-only and has a 2-minute POST exception), CSRF
+   middleware already mounted,
    a validation layer upstream. Read the framework's actual behavior for the version in
    `package.json` / `requirements.txt` / `go.mod`. Most "SQL injection in an ORM" findings die here.
 2. **Follow the call chain to a real entry point.** A dangerous function that is only ever
@@ -60,6 +65,8 @@ These exist because the default failure mode of AI security review is confident 
 7. **Never invent a CVE, CWE number, or advisory.** If you are not certain of the identifier,
    describe the class in words instead.
 8. **Distinguish "I read this" from "I inferred this."** Quote the code you actually read.
+9. **Check the version before citing a known issue.** A vulnerable-function or advisory finding
+   in a dependency needs the installed version from the lockfile, not the manifest range.
 
 ## Severity rubric
 
@@ -87,7 +94,7 @@ Report every finding in exactly this shape. Ordered most severe first.
 ```
 [SEVERITY] Short, specific title
 Location:   path/to/file.ext:120-135  (plus any secondary sites)
-Class:      OWASP A01:2021 Broken Access Control / CWE-639
+Class:      OWASP A01:2025 Broken Access Control / CWE-639
 Confidence: Confirmed | Likely | Needs verification
 
 Evidence:
@@ -127,9 +134,11 @@ and what a human should still check manually. That is how the reader calibrates 
 ## Scope discipline
 
 Do not modify code during a review unless explicitly asked. A review is read-only. Findings
-first, patches second, and only on request. Never run exploits against a live system, never
-touch infrastructure you were not pointed at, and never exfiltrate real secrets into the
-transcript — refer to them by location, redact the value (`AKIA…7Q3F`).
+first, patches second, and only on request. Never run exploits during a review: active testing
+happens only in `/securitymaxxing:redteam`, only against systems the user owns or is authorized
+to test, and only after confirming the target. Never touch infrastructure you were not pointed
+at, and never exfiltrate real secrets into the transcript — refer to them by location, redact
+the value (`AKIA…7Q3F`).
 
 ## Always end with the next step
 

@@ -1,26 +1,32 @@
 ---
 description: Security review of uncommitted changes, a branch, or a PR — catches vulnerabilities at the moment they're introduced.
 argument-hint: "[git ref, PR number, or blank for working tree]"
-allowed-tools: Read, Grep, Glob, Bash(git:*), Bash(gh pr:*), Bash(rg:*)
+allowed-tools: Read, Grep, Glob, Bash(git diff:*), Bash(git status:*), Bash(git merge-base:*), Bash(git log:*), Bash(git show:*), Bash(git ls-files:*), Bash(git rev-parse:*), Bash(git symbolic-ref:*), Bash(git fetch:*), Bash(gh pr diff:*), Bash(gh pr view:*)
 ---
 
 # Security review of a change
 
 Review only what changed, but judge it against the whole system. Follow the
-`security-review-method` skill. **Read-only — do not edit.**
+`security-review-method` skill. **Read-only — do not edit.** Never run `gh pr checkout`,
+`gh pr merge`, `gh pr comment`, or any git command that changes the working tree or a remote.
 
 Target: $ARGUMENTS
 
 ## Get the diff
 
 Resolve the target in this order:
-- A number like `1234` → `gh pr diff 1234` (and `gh pr view 1234` for intent).
-- A git ref or range → `git diff <ref>`.
+- A number like `1234` → `gh pr diff 1234` (and `gh pr view 1234` for intent). The local
+  checkout is not the PR head: read context with `gh pr view 1234 --json headRefOid,files`, then
+  `git fetch origin pull/1234/head` and `git show <sha>:<path>`.
+- A range (`a..b` / `a...b`) → `git diff <range>`. A single base ref → `git diff <ref>...HEAD`
+  (changes on this branch since it diverged).
 - Empty → review uncommitted work: `git diff HEAD`, plus `git status` for untracked files.
-  If the working tree is clean, review the current branch against its merge base:
-  `git merge-base HEAD origin/main` (try `main`, then `master`, then `develop`).
+  If the working tree is clean, find the default branch with
+  `git symbolic-ref --short refs/remotes/origin/HEAD` (fall back to `main`, then `master`) and
+  review `git diff origin/<default>...HEAD`.
 
 Always check untracked files too — a newly added `.env` or key file never shows in `git diff`.
+List them with `git ls-files --others --exclude-standard`, then Read each one.
 
 ## What to look for in a diff specifically
 
@@ -37,13 +43,16 @@ Diffs have failure modes that a full audit doesn't:
    A diff that deletes a security control is the highest-yield thing in this command.
 
 3. **A widened permission or scope.** Changed IAM policy, CORS origin, cookie `SameSite`,
-   CSP directive, S3 bucket policy, database grant, feature flag default, or a role check
-   loosened from `admin` to `member`.
+   CSP directive, S3 bucket policy, database grant, feature flag default, a role check
+   loosened from `admin` to `member`, or a CI workflow change (new `pull_request_target` /
+   `workflow_run` trigger, broadened `permissions:`, unpinned action, `${{ github.event.* }}` in
+   `run:`).
 
 4. **A new secret.** Any added string that looks like a key, token, password, connection
    string, or private key — including in tests, fixtures, CI workflows, and Dockerfiles.
-   Report the location, redact the value, and say plainly that it must be **rotated**, not
-   just deleted, because it is in git history now.
+   Report the location and redact the value. If it is already committed or pushed, it must be
+   **rotated**, not just deleted — it is in history. If it exists only in the uncommitted tree,
+   remove it before committing, and rotate it if it was ever shared, logged, or pushed elsewhere.
 
 5. **A new dependency.** Check what it is, who maintains it, whether the name is a plausible
    typosquat of a popular package, whether it runs install scripts, and whether the version
@@ -78,5 +87,5 @@ Standard finding format. Then:
 ## Recommended next step
 
 Close by printing one line — `→ Recommended next: …`:
-- Blocking finding → `/securitymaxxing:fix` before merge.
+- Blocking finding → `/securitymaxxing:fix` before merge (or `/securitymaxxing:redteam` first if exploitability is disputed).
 - Safe to merge → say so and merge; no next command needed.

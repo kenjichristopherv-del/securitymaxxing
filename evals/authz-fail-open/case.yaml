@@ -1,0 +1,6 @@
+schema_version: "1.1"
+name: authz-fail-open
+description: /authz on an admin API whose guards fail open — an invalid token skips the admin check, and a policy-service error allows the request (OWASP A10:2025).
+tags: [authz, recall, a10]
+context:
+  scaffold_script: scaffold.sh

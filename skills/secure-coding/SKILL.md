@@ -1,16 +1,18 @@
 ---
 name: secure-coding
 description: >
-  Secure-by-default patterns to apply while writing or modifying application code. Use this
-  skill whenever building or editing code that touches a security-relevant surface: HTTP
-  routes, API endpoints, controllers, resolvers, or webhook handlers; login, signup, sessions,
-  passwords, tokens, or JWTs; database queries, especially raw SQL or dynamic query building;
-  anything that reads a user/tenant/resource ID from a request; file uploads, downloads, or
-  filesystem paths; shell or subprocess execution; outbound HTTP requests to URLs that come
-  from user input; rendering user content as HTML; encryption, hashing, or random token
-  generation; secrets, API keys, and environment configuration; CORS, cookies, and security
-  headers. Also use when the user asks to 'make this secure', 'harden', or 'add auth'. Provides
-  the correct pattern to write the first time, so the vulnerability never exists.
+  Load BEFORE writing or editing any server-side code that handles a request, a user, an ID, a
+  query, a file, a secret, or a dependency — it supplies the secure pattern to write the first
+  time, so the vulnerability never exists. Covers: HTTP routes, routers, API endpoints, handlers,
+  controllers, resolvers, webhooks; login, signup, sessions, passwords, tokens, JWTs; database
+  queries, especially raw SQL or dynamic query building; anything that reads a user/tenant/
+  resource ID from a request (the ownership check); file uploads, downloads, and filesystem
+  paths; shell or subprocess calls; outbound HTTP to user-supplied URLs; rendering user content
+  as HTML; encryption, hashing, random tokens; secrets, API keys, env config; CORS, cookies,
+  security headers; adding a dependency. Any web stack (Express, Next.js API routes, FastAPI,
+  Django, Flask, Rails, Spring, Go net/http). Trigger on 'route', 'endpoint', 'router', 'API',
+  'handler', 'controller', 'GET /', 'POST /', ':id', 'req.user', 'current user', 'login', 'auth',
+  'query', 'SQL', 'upload', 'webhook', 'make this secure', 'harden', 'add auth'.
 ---
 
 # Secure Coding
@@ -84,15 +86,20 @@ Untrusted means: anything from a request, an upload, a webhook, a third-party AP
       raise Forbidden()
   ```
 - **Outbound URLs (SSRF)** — allowlist the destination host if you possibly can. If you can't,
-  reject loopback, link-local (`169.254.0.0/16`, especially `169.254.169.254`), and private
-  ranges; allow only `http`/`https`; and **re-validate after every redirect**, since the first
-  hop can be public and the second internal.
+  allow only `http`/`https` and reject loopback (`127.0.0.0/8`, `::1`), unspecified (`0.0.0.0`,
+  `::`), link-local (`169.254.0.0/16` — especially `169.254.169.254` — and `fe80::/10`), private
+  (`10/8`, `172.16/12`, `192.168/16`, `fc00::/7`), CGNAT `100.64.0.0/10`, and IPv4-mapped IPv6
+  (`::ffff:0:0/96`). **Resolve DNS once, validate every resolved IP, then connect to that pinned
+  IP** — checking the hostname and letting the HTTP client resolve again is defeated by DNS
+  rebinding. Disable automatic redirects; if you must follow them, re-run the full check per
+  hop. Better still, route egress through a proxy that enforces this (e.g. smokescreen).
 - **HTML** — let the framework escape by default. Reach for `dangerouslySetInnerHTML`,
-  `v-html`, `|safe`, or `innerHTML` only with a maintained sanitizer (DOMPurify, bleach) and
+  `v-html`, `|safe`, or `innerHTML` only with a maintained sanitizer (DOMPurify, nh3) and
   an explicit reason. Never build a URL attribute from user input without checking the scheme
   — `javascript:` and `data:` are executable.
-- **Deserialization** — `yaml.safe_load`, never `pickle` on untrusted data, XML parsers with
-  external entities disabled.
+- **Deserialization** — `yaml.safe_load`; never `pickle`, Java `ObjectInputStream`, .NET
+  `BinaryFormatter`, PHP `unserialize`, or Ruby `Marshal` on untrusted data; XML parsers with
+  DTDs and external entities disabled.
 - **Templates** — pass user data as *context*, never concatenate it into the template string.
 
 Validate at the boundary with a schema (zod, pydantic, valibot, struct tags) so the rest of the
@@ -101,15 +108,29 @@ what isn't.
 
 ## Authentication and sessions
 
-- Passwords: **bcrypt, scrypt, or argon2id**. Never a general-purpose hash, salted or not.
+- Passwords: **argon2id** (minimum m=19 MiB, t=2, p=1), **scrypt** (N=2^17, r=8, p=1),
+  **bcrypt** (cost ≥10), or **PBKDF2-HMAC-SHA256** (≥600,000 iterations, where FIPS is required)
+  — the OWASP Password Storage minimums. A framework's built-in default hasher is fine. Never a
+  general-purpose hash, salted or not. bcrypt silently uses only the first **72 bytes**: reject
+  longer passwords or use argon2id, and never pre-hash into a raw binary digest (a NUL byte
+  truncates it). Verify with the library's own (constant-time) verify function.
 - Tokens, session IDs, reset codes, OTPs, salts, IVs: a CSPRNG only — `crypto.randomBytes`,
   `secrets.token_urlsafe`, `crypto/rand`. Never `Math.random()`, `random`, or a timestamp.
-- Cookies: `HttpOnly`, `Secure`, `SameSite=Lax` (or `Strict`), narrow `Domain`, sane expiry.
+- Cookies: `HttpOnly`, `Secure`, `SameSite=Lax` (or `Strict`) set explicitly, narrow `Domain`,
+  sane expiry. Prefer the `__Host-` prefix for session cookies.
+- CSRF: cookie-authenticated state-changing requests need a CSRF token (or a verified `Origin`/
+  `Sec-Fetch-Site` check) in addition to SameSite — browser default-Lax is Chromium-only,
+  SameSite does nothing against a sibling subdomain, and it allows top-level GET. Never change
+  state on GET.
 - Regenerate the session on login and on any privilege change. Invalidate server-side on logout.
 - JWTs: verify the signature, **pin the algorithm**, and check `exp`, `iss`, and `aud`. Never
   `decode` without verification. Keep them short-lived, since you usually can't revoke them.
-- Compare secrets, tokens, and MACs in constant time (`timingSafeEqual`, `compare_digest`) —
-  never with `==` or a prefix/`startswith` check.
+  Ignore `jku`/`x5u`/embedded `jwk` headers, and never let `kid` select a file path or SQL row
+  unvalidated.
+- Compare secrets, tokens, and MACs in constant time — Node `crypto.timingSafeEqual` on
+  equal-length Buffers (e.g. compare HMAC digests of both values, since it throws on a length
+  mismatch), Python `hmac.compare_digest`, Go `subtle.ConstantTimeCompare` — never with `==` or a
+  prefix/`startswith` check.
 - Password reset tokens: random, hashed at rest, single-use, short expiry, and the link's host
   from config — never from the `Host` header.
 - Rate-limit login, signup, reset, and OTP by account *and* by IP. Return identical responses
@@ -134,6 +155,10 @@ If you notice a secret already committed, say so immediately and state that it n
 - Don't log PII, credentials, tokens, or full request bodies. Do log auth failures, authz
   denials, and admin actions with actor, action, target, and time — you'll need them during an
   incident.
+- **Fail closed.** An exception inside an auth/authz check, a policy-engine timeout, a
+  signature-verification error, or a missing config value must deny — never fall through to
+  `next()`, `return True`, or a default role. No empty `catch` around a security check; no
+  `except Exception: pass`.
 
 ## Limits, by default
 
@@ -146,9 +171,17 @@ cost problem waiting for someone to notice.
 
 Don't disable protections to make something work. If you find yourself writing
 `rejectUnauthorized: false`, `verify=False`, `InsecureSkipVerify: true`, `csrf_exempt`,
-`# nosec`, `eslint-disable security/*`, or `@SuppressWarnings`, stop — that is almost always
+`# nosec`, `eslint-disable security/*`, `@SuppressFBWarnings`, or `// NOSONAR`, stop — that is almost always
 the wrong fix. If it's genuinely necessary, isolate it to the narrowest possible scope and
 leave a comment explaining why it's safe there.
+
+## Adding dependencies
+
+Before adding a package, confirm it exists and is the one you meant — AI assistants hallucinate
+plausible package names, and attackers register them (slopsquatting). Prefer well-maintained
+packages, commit the lockfile, pin exact versions, install with `npm ci --ignore-scripts` (or
+the ecosystem equivalent) where feasible, and pin CI actions and base images by commit SHA or
+digest.
 
 ## When you're unsure
 
