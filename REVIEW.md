@@ -18,6 +18,10 @@ the review, read the findings, and stand behind the report, that's what this is.
 | 30-minute call to walk through the findings and the fixes | | ✓ |
 | Re-check after you've fixed things, with an updated report | | ✓ |
 
+**Founding offer: the first five launch reviews are $149** instead of $249, in exchange for a
+short testimonial you're happy for me to quote (your words, your name or just your role, and
+never your findings). Say "founding offer" in your request.
+
 Sized for a typical indie or early-stage app: one repository, one main service. Bigger systems,
 several services, or a mobile app plus backend — ask, and you'll get a quote before anything
 starts.
@@ -30,9 +34,9 @@ starts.
    (below). Nothing is charged until you've agreed to both.
 3. **Access.** You grant read-only access to the repository (a GitHub collaborator invite, or a
    zip). Never send passwords, API keys, or production database access — they aren't needed.
-4. **Review.** Typically within a week of access.
-5. **Report.** You receive the report and an invoice. With fix support, we then book the call and
-   the re-check.
+4. **Review.** Within 7 days of receiving access.
+5. **Report.** You receive the report and an invoice. You pay by card through the invoice's
+   payment link, within 14 days. With fix support, we then book the call and the re-check.
 
 ## What it is — and isn't
 
@@ -49,8 +53,8 @@ starts.
 - Your code is reviewed with Claude (Anthropic) through Claude Code, the same way securitymaxxing
   runs on your own machine. If that doesn't work for your company's policies, say so before
   sharing anything.
-- Access is read-only, used only for your review, and removed — and any local copy deleted — once
-  the report is delivered (or after the re-check, with fix support).
+- Access is read-only and used only for your review. It's removed, and any local copy deleted,
+  within 7 days of the final delivery (the report, or the re-check with fix support).
 - Findings are confidential. Nothing about your app is published or reused without your written
   permission.
 

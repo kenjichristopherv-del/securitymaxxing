@@ -48,6 +48,7 @@ body:
     attributes:
       label: Which review?
       options:
+        - Founding offer — launch review for $149 + a short testimonial
         - Launch review ($249)
         - Review + fix support ($499)
         - Not sure — help me choose

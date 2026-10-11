@@ -136,7 +136,8 @@ the findings into a shareable report: a plain-English verdict and fix plan up fr
 technical detail behind it.
 
 **Rather have a person do it?** A [hands-on launch review](REVIEW.md) runs the deep review for
-you, checks every finding by hand, and delivers the report. It starts at $249.
+you, checks every finding by hand, and delivers the report: $249, or $149 for the first five
+founding clients.
 
 ---
 
