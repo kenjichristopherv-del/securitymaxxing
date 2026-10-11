@@ -1,0 +1,17 @@
+{
+  "description": "securitymaxxing write-time check: after Claude writes or edits source code, adds a short secure-coding reminder only when the new code contains a known risky pattern. Never blocks. Disable with SECURITYMAXXING_HOOKS=off.",
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh \"${CLAUDE_PLUGIN_ROOT}/scripts/secure-edit-check.sh\"",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}

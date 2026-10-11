@@ -1,7 +1,7 @@
 # securitymaxxing
 
 [![License: Apache 2.0](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-1.0.0-informational.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-1.1.0-informational.svg)](CHANGELOG.md)
 [![OWASP Top 10:2025](https://img.shields.io/badge/OWASP-Top%2010%3A2025-black.svg)](https://owasp.org/Top10/2025/)
 [![Claude Code plugin](https://img.shields.io/badge/Claude%20Code-plugin-d97757.svg)](https://code.claude.com/docs/en/plugins)
 
@@ -16,23 +16,46 @@ of eyes, and the builder who shipped something with AI help and needs a straight
 
 ## Why this exists
 
-Ask any AI to "check my code for security issues" and you get a page of confident, plausible,
-mostly-wrong findings. Missing headers on a JSON API. SQL injection in a parameterized query.
-A CVE number that doesn't exist. You read it twice, find nothing real, and never run it again —
-so the one endpoint that *does* leak your customers' addresses ships anyway.
+Today's models are already decent security reviewers. What they aren't is **thorough** or
+**consistent**: a single review of a real codebase reads part of it, a different part each time,
+and reports whatever it happened to look at.
 
-The problem isn't the model. It's the prompt.
+We measured this on a production FastAPI app (171 routes, a 16,000-line main module), against
+53 weaknesses, each verified against the code by an independent verifier who didn't know which
+run had raised it:
 
-securitymaxxing encodes the discipline a real security engineer applies:
+| | Plain Claude Code | `/securitymaxxing:audit --deep` |
+|---|---|---|
+| Real risk found, severity-weighted (mean of 3 runs) | 27% | **52%** |
+| Worst run | 16% | **51%** |
+| Real issues per run | 12 | **23** |
+| Found every MEDIUM-severity issue | 1 run in 3 | **3 runs in 3** |
+| False positives | 0 | 1 in ~68 findings |
+| Cost per run (Sonnet 5.5) | ~$0.50 | ~$5.70 |
 
-- **No finding without a traced path** from an attacker-controlled source to a dangerous sink.
-  Both ends named, or it's flagged "needs verification" instead of reported as fact.
-- **Check the mitigation first.** Most "SQL injection in an ORM" findings die once you read
-  what the framework actually does in that version.
-- **Severity by realistic exploitability × impact**, not by how frightening the bug class sounds.
-- **Zero findings is a valid result.** No padding a report to look thorough.
-- **Every finding carries the exploit path and the patch** — the requests an attacker sends,
-  and the corrected code.
+`--deep` gets there by changing the *process*, not the prompt: a mapper splits the app into
+units that together contain every entry point, reviewers cover each unit exhaustively in
+parallel, and a separate verifier tries to kill every finding and re-rates the survivors. The
+method is in [`bench/`](bench/), so you can run the same comparison on your own code.
+
+Honest footnote: the standard `/securitymaxxing:audit` (no `--deep`) was **not** better than
+plain Claude at finding issues in this test. Its value is everything around the finding — the
+same evidence rules, severity that doesn't cry wolf, guard rails, and the find → prove → fix
+loop below.
+
+What securitymaxxing adds either way:
+
+- **Evidence, not vibes.** No finding without a traced path from an attacker-controlled source to
+  a dangerous sink. Mitigations are checked first; severity is exploitability × impact; zero
+  findings is a valid answer.
+- **Guard rails.** Reviews are read-only, secrets are never printed, every read-only command is
+  allowlisted to the exact subcommands it needs, and `redteam` asks before it attacks anything.
+- **A loop, not a report.** `audit` → `redteam` proves it → `fix` closes it with a regression test
+  → the next audit confirms it, tracked in a findings ledger.
+- **Prevention at write time.** When Claude writes a route, a query, or auth code, a hook and the
+  `secure-coding` skill supply the safe pattern before the bug exists.
+- **Plain English when you want it.** `vibe-check` and `help` are written for people who build
+  with AI and don't speak AppSec.
 
 ## Install
 
@@ -64,7 +87,7 @@ Type `/securitymaxxing:` in Claude Code to list them all. Not sure where to star
 | Command | What it does |
 |---|---|
 | `/securitymaxxing:help` | Not sure where to start? A guided, plain-English pass that finds, proves, fixes, and re-checks — asking before every code change |
-| `/securitymaxxing:audit` | Full audit — maps the attack surface first, then works every vulnerability class with traced evidence |
+| `/securitymaxxing:audit` | Full audit — maps the attack surface first, then works every vulnerability class with traced evidence. Add `--deep` for the multi-agent version that covers every entry point and verifies every finding (slower, ~10× the cost, about twice the recall) |
 | `/securitymaxxing:diff` | Reviews a diff, branch, or PR. Catches the removed guard clause and the route registered on the wrong router |
 | `/securitymaxxing:vibe-check` | Plain-English safety check. No jargon, real rigor, direct verdict |
 | `/securitymaxxing:ship-check` | Pre-launch gate. Ten blockers, then should-fixes, then a SHIP / DO NOT SHIP verdict |
@@ -79,7 +102,7 @@ Type `/securitymaxxing:` in Claude Code to list them all. Not sure where to star
 | `/securitymaxxing:harden` | Docker, Kubernetes, Terraform, cloud IAM, and detection readiness |
 | `/securitymaxxing:llm` | Prompt injection, tool authority, RAG tenant isolation, unsafe model output |
 | `/securitymaxxing:redteam` | Proves it. Builds a working PoC against your own app, and attacks your defenses to confirm they hold |
-| `/securitymaxxing:fix` | The only command that writes code. Fixes the class, verifies the patch, adds the regression test |
+| `/securitymaxxing:fix` | Fixes the class, verifies the patch, adds the regression test. Works from the findings ledger |
 | `/securitymaxxing:explain` | Explains a vulnerability against *your* code, so you can spot it yourself next time |
 
 Every command is read-only except `fix` and `help` (which write patches, and `help` asks first),
@@ -95,6 +118,25 @@ each is told in writing never to commit, push, rewrite history, or rotate a cred
 Every report ends with one `→ Recommended next:` line, picked from what was actually found, so
 you're never left holding findings with no path forward.
 
+**Findings ledger.** `audit` keeps `.securitymaxxing/findings.json` (add it to `.gitignore`), so
+the next audit reports what's new, still open, fixed, or **regressed**; `fix` and `redteam` work
+from it, and record what they fixed and proved. Accepting a risk or marking a false positive stays
+your call — set the `status` yourself and later runs respect it.
+
+## Write-time check
+
+A `PostToolUse` hook runs after Claude writes or edits source code. If the new code contains a
+pattern that's commonly the start of a vulnerability — a route reading a resource ID with no
+owner check in sight, SQL built from strings, a shell command, an HTML-escaping opt-out, an
+unverified token decode, a server-side fetch of a request URL, an error path that may fail open,
+or something shaped like a live credential — it hands Claude a one-line reminder of the safe
+pattern. It never blocks, never edits, and stays silent otherwise. It's a POSIX `sh` script with
+no dependencies; turn it off with `SECURITYMAXXING_HOOKS=off`.
+
+If you also run Anthropic's `security-guidance` plugin, you'll get both sets of reminders; they
+overlap on a few patterns and are complementary on the rest (this one focuses on ownership checks
+and fail-open paths).
+
 ## The skills
 
 Skills load automatically when Claude detects the relevant work — no command needed.
@@ -105,13 +147,15 @@ Skills load automatically when Claude detects the relevant work — no command n
 | **llm-app-security** | Building agents, tool calling, RAG, MCP servers, or any LLM feature |
 | **security-review-method** | Any security review — the evidence discipline, severity rubric, and finding format the commands share |
 
-`secure-coding` is the quiet one that matters most. It doesn't wait for an audit; it makes the
-ownership check part of the query the first time the query gets written.
+`secure-coding` is the quiet one. It doesn't wait for an audit; it makes the ownership check part
+of the query the first time the query gets written — and the write-time hook backs it up for the
+times it doesn't load.
 
 ## Try it
 
 ```
 /securitymaxxing:help                # start here if you just want it made safe
+/securitymaxxing:audit --deep        # the thorough one, before a launch or a big release
 /securitymaxxing:vibe-check          # a plain-English verdict, no changes made
 /securitymaxxing:authz src/api       # start here if you are
 /securitymaxxing:diff                # before every commit that touches a route
@@ -133,9 +177,8 @@ can trust.
 Cursor, Copilot, ChatGPT, or anywhere else; edit them for your stack; or read them to see
 exactly what the commands are asking for.
 
-Start with [Section 0, the preamble](PROMPTS.md#0-the-preamble). It's the highest-leverage
-paragraph in the repo — paste it before any security prompt in any tool and the output quality
-changes immediately.
+Start with [Section 0, the preamble](PROMPTS.md#0-the-preamble): it carries the evidence rules
+that every other prompt depends on, so paste it before any security prompt in any tool.
 
 ## Coverage
 
@@ -181,6 +224,21 @@ claude plugin eval . --scaffold --threshold 0.8 \
 `--scaffold` copies each case's fixture into the run's sandbox (and, for the secrets case, commits
 it to a throwaway git repo). The scripts are a few lines in `evals/*/scaffold.sh` — read them
 before you pass the flag.
+
+## Benchmark
+
+[`bench/`](bench/) runs plain Claude Code, `audit`, and `audit --deep` against any repository, each
+isolated from your own settings and plugins, then scores the reports against a verified list of
+issues:
+
+```
+python3 bench/run.py --target ~/code/app --arm plain --arm deep --runs 3 --out results/
+python3 bench/score.py --truth truth.json --runs results/
+```
+
+Findings that match nothing in the truth file are listed separately — verify them before counting
+them as either real or false. The truth file for the numbers above describes a private
+application's weaknesses, so it isn't published.
 
 ## Contributing
 

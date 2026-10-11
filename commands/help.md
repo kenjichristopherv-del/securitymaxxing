@@ -1,7 +1,7 @@
 ---
 description: "Not sure if your app is safe? A guided, plain-English pass from 'is this okay?' to the real problems found, proven, fixed, and re-checked."
 argument-hint: "[what your app does, or what you're worried about] (optional)"
-allowed-tools: Read, Grep, Glob, Edit, Write, Bash, TodoWrite
+allowed-tools: Read, Grep, Glob, Edit, Write, Bash, TodoWrite, TaskCreate, TaskUpdate, TaskList
 ---
 
 # Help me make this safe
@@ -57,7 +57,7 @@ three sentences, what you think the app does and who can reach it — so they ca
 early. Ask at most two questions, for example: *"Is this live on the internet yet?"* and *"Was
 this repo ever public?"*
 
-Build a TodoWrite list for the session: check → prove → fix → re-check.
+Build a task list for the session (TodoWrite or TaskCreate, whichever you have): check → prove → fix → re-check.
 
 ## Step 2 — Find the real problems
 

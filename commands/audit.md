@@ -1,19 +1,50 @@
 ---
 description: Full evidence-based security audit of the codebase — traced findings with file:line, exploit paths, severity, and patches.
-argument-hint: "[path or area, e.g. src/api or 'the auth flow'] (optional)"
-allowed-tools: Read, Grep, Glob, Bash(git ls-files:*), Bash(git log:*), TodoWrite
+argument-hint: "[--deep] [path or area, e.g. src/api or 'the auth flow'] (optional)"
+allowed-tools: Read, Grep, Glob, Agent, Bash(git ls-files:*), Bash(git log:*), Bash(git rev-parse:*), Bash(which:*), Bash(semgrep scan:*), Bash(gitleaks dir:*), Bash(gitleaks detect:*), Bash(osv-scanner scan:*), Edit(.securitymaxxing/**), TodoWrite, TaskCreate, TaskUpdate, TaskList
 ---
 
 # Full security audit
 
 Perform a rigorous application security audit. Follow the `security-review-method` skill for
 evidence discipline, severity, and the finding format. **This is read-only — do not edit any
-file.**
+application file.** The only thing you may write is the findings ledger in `.securitymaxxing/`.
 
-Scope: $ARGUMENTS
+Arguments: $ARGUMENTS
 
-If no scope was given, audit the whole repository, prioritizing code reachable from untrusted
-input.
+If the arguments include `--deep`, follow **Deep mode** below instead of Phases 1–3. Any other
+text is the scope. If no scope was given, audit the whole repository, prioritizing code reachable
+from untrusted input.
+
+## Deep mode (`--deep`)
+
+A single reviewer reads only part of a large codebase, and a different part each run. Deep mode
+splits the work so every entry point is read, then has every finding independently challenged.
+It costs several times a normal audit; say so in one line before starting.
+
+1. **Map.** Dispatch the `securitymaxxing:mapper` agent with the scope. It returns the stack, the
+   enforcement layer, and 3–8 review units that together contain every entry point.
+2. **Scan (optional).** If these tools are installed (`which semgrep gitleaks osv-scanner`), run them read-only and keep the output for
+   triage — never with fix/autofix flags:
+   `semgrep scan --config p/default --metrics=off --json --quiet`,
+   `gitleaks dir --redact --no-banner` (or `gitleaks detect --no-git --redact`),
+   `osv-scanner scan source -r .` (this sends package names to osv.dev; skip it if the user said
+   no network). A scanner hit is a lead, not a finding: route each to the reviewer whose unit
+   contains it.
+3. **Review, in parallel.** Dispatch one `securitymaxxing:reviewer` agent per unit **in a single
+   message**, so they run concurrently. Give each its unit verbatim, the enforcement summary, and
+   any scanner leads for its files.
+4. **Merge.** Collect every finding. Merge duplicates (same root cause and place). Check every
+   reviewer's COVERAGE: if a unit left entry points unchecked, dispatch one more reviewer for just
+   those.
+5. **Verify, in parallel.** Number the merged findings. Dispatch `securitymaxxing:verifier` agents
+   in a single message, about 6 findings each. Keep REAL and PARTIAL findings at the verifier's
+   severity. Drop FALSE ones, but list them under "Checked and clean" with the control that kills
+   them. Report UNVERIFIABLE ones as **Needs verification**, saying what would settle it.
+6. **Report** as in Phase 4, adding a coverage line: entry points mapped / reviewed, units,
+   findings raised / verified / dropped.
+
+If you cannot dispatch agents in this environment, say so and run the standard audit instead.
 
 ## Phase 1 — Map the attack surface before reading any vulnerability
 
@@ -141,7 +172,9 @@ it is worth reporting; one that doesn't was never real.
 
 ## Phase 4 — Report
 
-Use the finding format from `security-review-method`. Structure:
+Use the finding format from `security-review-method`. Put the **complete report in your final
+message** — not a summary of a report printed earlier; many readers only see the last message.
+Structure:
 
 1. **Attack surface map** — the Phase 1 output, kept short.
 2. **Findings** — most severe first, in the standard format.
@@ -150,7 +183,32 @@ Use the finding format from `security-review-method`. Structure:
    running system), and what a human should verify manually.
 5. **Do this first** — the top 3 fixes ranked by risk reduced per unit of effort.
 
-Then stop. Do not begin fixing — the recommended-next line below says where to go.
+Then update the findings ledger (below) and stop. Do not begin fixing — the recommended-next line
+below says where to go.
+
+## Findings ledger
+
+Keep a machine-readable record at `.securitymaxxing/findings.json` (write it with the Write tool, not the shell) so later runs, `fix`, and
+`redteam` can build on this one. If you cannot write it (no permission), skip it and say so in
+one line under Coverage.
+
+```json
+{"version": 1,
+ "findings": [{"id": "SMX-<class>-<short-slug>", "title": "...", "severity": "MEDIUM",
+               "class": "OWASP A07:2025 / CWE-613", "location": "app/main.py:16012",
+               "status": "open", "confidence": "Confirmed",
+               "first_seen": "YYYY-MM-DD", "last_seen": "YYYY-MM-DD", "commit": "<short sha>"}]}
+```
+
+- If the file exists, read it first and **merge**: keep each existing `id` for the same root cause
+  (match on title and location, not on the exact line); update `last_seen` and severity; add new
+  findings as `open`.
+- A previously `open` finding you checked and no longer see → `fixed`. A `fixed` finding that is
+  back → `open`, and call it out as a **regression** in the report.
+- Never change `accepted` or `false_positive` — those are the user's decisions.
+- Open the report with one line: new / still open / fixed / regressed since the last audit.
+- If `.securitymaxxing/` isn't in `.gitignore`, tell the user once to add it.
+
 
 ## Recommended next step
 

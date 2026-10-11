@@ -1,7 +1,7 @@
 ---
 description: Prove it — build working proof-of-concept exploits for findings against your own app, and confirm defenses actually hold.
 argument-hint: "[finding, endpoint, or 'validate the last audit']"
-allowed-tools: Read, Grep, Glob, Bash, Write, Edit, TodoWrite
+allowed-tools: Read, Grep, Glob, Bash, Write, Edit, TodoWrite, TaskCreate, TaskUpdate, TaskList
 ---
 
 # Red team — validate by attacking
@@ -14,7 +14,12 @@ defended actually resist the attack.
 Target: $ARGUMENTS
 
 If empty, validate the findings from the most recent review in this conversation; if there are
-none, ask for a target.
+none there, use the `open` findings in `.securitymaxxing/findings.json`; if there are none
+anywhere, ask for a target.
+
+Record each verdict in the ledger if it exists: set `"proof": "exploited" | "not_exploitable" |
+"blocked_by <control>" | "static_only"` and `"proved_on": "YYYY-MM-DD"` on the finding. Don't change
+its `status` — whether a finding is accepted or a false positive is the user's call.
 
 ## Authorization — read this first, every time
 
@@ -46,7 +51,7 @@ path it hits, and the expected result — without sending it.
 - If handed a specific finding or a prior audit's output, take each finding in turn.
 - If handed an endpoint or area, first run the relevant checks (borrow from `audit`, `authz`,
   `injection`) to produce candidate findings, then validate those.
-- Build a TodoWrite list, one entry per claim you're going to try to prove.
+- Build a task list (TodoWrite or TaskCreate, whichever you have), one entry per claim you're going to try to prove.
 
 For each claim, write down **the falsifiable prediction** before you test: "if this IDOR is
 real, requesting order 1042 as user B returns user A's data." A test without a prediction proves

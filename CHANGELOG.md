@@ -1,5 +1,41 @@
 # Changelog
 
+## 1.1.0 — 2026-10-11
+
+Measured, not claimed. A blind benchmark on a production FastAPI app (171 routes, 53 verified
+weaknesses) showed a single-pass audit, plain or not, finds about a quarter of the real risk and
+varies a lot between runs. This release adds the process that fixes that.
+
+### Added
+- **`/securitymaxxing:audit --deep`.** Three plugin agents do the work:
+  - `mapper` splits the app into review units that together hold every entry point.
+  - `reviewer` agents cover each unit in parallel and must account for every route.
+  - `verifier` agents try to kill each finding and re-rate the survivors.
+
+  It found 52% of the severity-weighted risk, against 27% for plain Claude Code. Every run found
+  all MEDIUM issues, and runs ranged only 51–54%. That cost ~11× more per run.
+- **Optional scanner leads in deep mode.** `semgrep`, `gitleaks` and `osv-scanner` run read-only
+  if installed. Their hits are routed to reviewers to triage, not reported raw.
+- **Findings ledger (`.securitymaxxing/findings.json`).**
+  - Audits report what is new, still open, fixed or regressed.
+  - `fix` and `redteam` take findings from the ledger and record what they fixed and proved.
+  - `accepted` and `false_positive` stay the user's call.
+- **Write-time check.** A `PostToolUse` hook adds a one-line safe-pattern reminder only when
+  freshly written code contains a known risky pattern. It never blocks. It is POSIX `sh` with no
+  dependencies; turn it off with `SECURITYMAXXING_HOOKS=off`.
+- **`bench/`.** `run.py` runs plain, fast and deep audits isolated from local settings and
+  plugins; `score.py` scores them against a verified truth file with an LLM judge. The judge was
+  calibrated to reproduce hand-verified scores exactly.
+
+### Changed
+- **Audits put the complete report in the final message.** Previously a summary could follow a
+  report printed earlier, and headless runs lost the report.
+- **Task tracking works on current models.** `fix`, `redteam`, `help` and `audit` accept
+  `TaskCreate`/`TaskUpdate`/`TaskList` as well as `TodoWrite`, which newer models don't have.
+- **README rewritten around the measured results.** It now states plainly that the standard
+  audit is no better than plain Claude at recall, and that its value is the evidence rules, guard
+  rails and workflow.
+
 ## 1.0.0 — 2026-10-11
 
 First stable release. From here, command names, their arguments, and the finding format are

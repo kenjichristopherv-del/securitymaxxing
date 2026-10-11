@@ -1,7 +1,7 @@
 ---
 description: Remediate confirmed security findings — minimal, verified patches applied one at a time with tests.
 argument-hint: "[finding, file, or 'all criticals']"
-allowed-tools: Read, Grep, Glob, Edit, Write, Bash, TodoWrite
+allowed-tools: Read, Grep, Glob, Edit, Write, Bash, TodoWrite, TaskCreate, TaskUpdate, TaskList
 ---
 
 # Remediate security findings
@@ -12,8 +12,15 @@ confirmed, verify each change, and don't break the application in the name of se
 
 To fix: $ARGUMENTS
 
-If empty, take the confirmed findings from this conversation, CRITICAL first; if there are none,
-ask which finding to fix.
+If empty, take the confirmed findings from this conversation, CRITICAL first. If there are none
+here but `.securitymaxxing/findings.json` exists, take its `open` findings (most severe first). If
+there are none anywhere, ask which finding to fix. A finding ID like `SMX-authz-…` refers to the
+ledger.
+
+When you finish, update the ledger if it exists: set each finding you fixed and verified to
+`"status": "fixed"` with `"fixed_on": "YYYY-MM-DD"`, and leave anything partially fixed `open` with a
+short `"note"`. Never mark something `fixed` that you didn't verify, and never change `accepted` or
+`false_positive` entries.
 
 ## Before touching anything
 
@@ -22,7 +29,7 @@ ask which finding to fix.
    yourself first — do not patch a false positive. Say so and stop if it isn't real.
 2. **Check the working tree is clean** (`git status`). If there are uncommitted changes,
    tell the user before editing so their work isn't tangled with security patches.
-3. **Order the work by severity**, and build a TodoWrite list. Fix one finding (one
+3. **Order the work by severity**, and build a task list (TodoWrite or TaskCreate, whichever you have). Fix one finding (one
    vulnerability class) per change.
 4. **If a leaked secret is involved, rotation comes first.** Say this explicitly and do not
    let a code edit be mistaken for the fix — the secret is still valid until it is revoked.
